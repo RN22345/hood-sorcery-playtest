@@ -1,6 +1,7 @@
 // HTML for every screen. Pure functions: (data, view/ui state) -> string. No game rules here:
 // anything rule-shaped comes from the engine (view, castProblem, lineStats).
 import { lineStats } from "../engine/line.js";
+import { roundSummary } from "../engine/summary.js";
 
 export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const el = (e) => `<img class="el" src="assets/elements/${e}.png" alt="${e}">`;
@@ -108,16 +109,30 @@ export function game(app, v) {
     ${sector ? `<div class="wheel ${sector.type}"><img src="${sector.img}" alt=""><div><b>${esc(sector.name)}</b>${v.fx !== sector.effect ? ` <small class="muted">(${esc(v.mode.name)} reading)</small>` : ""}<br><small>${esc(fxText(v, sector))}</small></div></div>` : ""}
     <div class="limits"><span class="muted">Line</span> <b>${v.limits?.line}</b> <span class="muted">· cards</span> <b>${v.limits?.maxCards}</b> <span class="muted">· deck ${v.deckCount}</span></div>
   </div>`;
-  const players = `<div class="players">${pl.map((p) => playerBox(app, v, p, track)).join("")}</div>`;
-  const zones = `<div class="zones">${v.zones.map((z) => zoneBox(app, v, z)).join("")}</div>`;
-  const body = v.over ? endPanel(app, v) : actionPanel(app, v);
+  const sum = roundSummary(v);
+  const hot = app.revealing && sum?.round === app.revealing ? sum : null; // what changed in the round just flipped
+  const players = `<div class="players">${pl.map((p) => playerBox(app, v, p, track, hot)).join("")}</div>`;
+  const zones = `<div class="zones">${v.zones.map((z) => zoneBox(app, v, z, hot)).join("")}</div>`;
+  const body = summaryStrip(v, sum, hot) + (v.over ? endPanel(app, v) : actionPanel(app, v));
   const hand = me && me.hand ? handRow(app, v, me) : app.cover == null && app.localCount > 1 && !v.over ? `<div class="hand hidden-hand muted">Hands are hidden between turns (pass-and-play).</div>` : "";
   const log = app.showLog ? `<aside class="log">${logHtml(v)}</aside>` : "";
-  const cover = app.cover != null ? coverScreen(app, v) : "";
+  const cover = app.cover != null ? coverScreen(app, v, sum) : "";
   return `${topbar(app, `${v.mode.name}${v.mode.modifiers.length ? " + " + v.mode.modifiers.map((id) => app.modifiers[id]?.name || id).join(", ") : ""}`)}
-  <main class="game ${app.showLog ? "with-log" : ""}">
+  <main class="game ${app.showLog ? "with-log" : ""} ${app.revealing ? "revealing" : ""} ${app.revealing && app.reveal.fresh ? "fresh" : ""}">
     <div class="table">${head}${zones}${players}${body}${hand}</div>${log}
   </main>${cover}`;
+}
+
+// The cards cast in a round, as small face-up cards that flip over on the first render of a reveal.
+const resOf = (v) => (v.revealed ? v.res : v.lastRes);
+const flipCards = (app, ids, start = 0) => ids.map((id, i) => `<span class="flip" style="--i:${start + i}">${card(app.data.cardMap[id], { cls: "mini", tag: "span" })}</span>`).join("");
+
+function summaryStrip(v, sum, hot) {
+  if (!sum) return "";
+  const items = sum.items.length
+    ? sum.items.map((i) => `<span class="sum-item ${i.kind}" style="--c:${v.players[i.pid].color}">${esc(i.text)}</span>`).join("")
+    : `<span class="muted">no change</span>`;
+  return `<div class="summary ${hot ? "hot" : ""}" title="${esc(sum.text)}"><b>Round ${sum.round}</b>${items}</div>`;
 }
 
 function fxText(v, sector) {
@@ -132,15 +147,19 @@ function fxText(v, sector) {
   return custom[v.fx] || sector.text;
 }
 
-function playerBox(app, v, p, track) {
+function playerBox(app, v, p, track, hot) {
   const r = v.revealed ? v.res[p.id] : null;
   const pend = v.pending;
   const deciding = pend && pend.who.includes(p.id);
   const done = deciding && pend.done.includes(p.id);
   const holds = v.zones.filter((z) => z.holder === p.id);
   const last = p.hist[p.hist.length - 1];
+  const mine = hot ? hot.items.filter((i) => i.pid === p.id) : [];
+  const delta = mine.find((i) => i.kind === track);
+  const shown = app.revealing ? resOf(v)?.[p.id] : null;
   const rank = v.ranks ? ` · rank A${v.ranks.atk.indexOf(p.id) + 1}/B${v.ranks.blk.indexOf(p.id) + 1}` : "";
-  return `<div class="pbox ${p.id === v.you ? "me" : ""}" style="--c:${p.color}">
+  return `<div class="pbox ${p.id === v.you ? "me" : ""} ${mine.length ? "changed" : ""}" style="--c:${p.color}">
+    ${delta ? `<span class="delta ${delta.delta > 0 === (track === "damage") ? "bad" : "good"}">${delta.delta > 0 ? "+" : "−"}${Math.abs(delta.delta)}</span>` : ""}
     <img class="standee" src="${p.img}" alt="">
     <div class="pinfo">
       <div class="pname">${esc(p.name)} ${p.kind === "bot" ? '<small class="muted">bot</small>' : ""}</div>
@@ -150,25 +169,28 @@ function playerBox(app, v, p, track) {
       ${p.at != null && v.mode.zones.castInto === "chosen" ? `<div class="small">At <b>${esc(v.zones[p.at]?.name)}</b></div>` : ""}
       ${holds.length ? `<div class="small">Holds ${holds.map((z) => esc(z.name)).join(", ")}</div>` : ""}
       ${r ? `<div class="small totals">ATK <b>${r.atk}</b> · BLK <b>${r.blk}</b> · ${r.len} fingers${r.rolls.length ? " · 🎲 " + r.rolls.map((x) => x.r).join(",") : ""}${rank}</div>` : ""}
+      ${shown ? `<div class="pline">${flipCards(app, shown.lines.flatMap((l) => l.cards), p.id * 3)}<small class="muted">A${shown.atk} · B${shown.blk}</small></div>` : ""}
       ${deciding ? `<div class="small state">${done ? "✔ locked in" : "…deciding"}</div>` : ""}
     </div></div>`;
 }
 
-function zoneBox(app, v, z) {
+function zoneBox(app, v, z, hot) {
   const holder = z.holder != null ? v.players[z.holder] : null;
-  const res = v.revealed ? v.res : v.lastRes;
+  const res = resOf(v);
+  const past = !v.revealed && !app.revealing; // last round's lines, dimmed once the reveal moment is over
+  const taken = hot?.items.some((i) => i.kind === "take" && i.zone === z.name);
   const lines = res
     ? v.players.map((p) => ({ p, ln: res[p.id]?.lines.find((l) => l.zone === z.i) })).filter((x) => x.ln)
     : [];
   const posted = v.mode.zones.castInto === "chosen" ? v.players.filter((p) => p.at === z.i) : [];
-  return `<div class="zone ${z.rich ? "rich" : ""} ${z.extra ? "extra" : ""}">
+  return `<div class="zone ${z.rich ? "rich" : ""} ${z.extra ? "extra" : ""} ${taken ? "taken" : ""}">
     <div class="zhead"><b>${esc(z.name)}</b>${z.rich ? ' <span class="badge">★ rich</span>' : ""}
       ${v.mode.id === "classic" ? "" : `<span class="holder">${holder ? "held by " + chip(holder) : '<span class="muted">unclaimed</span>'}</span>`}</div>
     ${posted.length && !v.revealed ? `<div class="posted">${posted.map(chip).join(" ")}</div>` : ""}
-    ${lines.length && !v.revealed ? `<div class="muted small">last round:</div>` : ""}
-    ${lines.map(({ p, ln }) => `<div class="zline ${v.revealed ? "" : "past"}" style="--c:${p.color}">
+    ${lines.length && !v.revealed ? `<div class="muted small">${past ? "last round:" : `round ${v.round - 1} revealed:`}</div>` : ""}
+    ${lines.map(({ p, ln }) => `<div class="zline ${past ? "past" : ""}" style="--c:${p.color}">
         <span class="chip" style="--c:${p.color}">${esc(p.name)}</span>
-        <span class="mini">${ln.cards.map((id) => card(app.data.cardMap[id], { cls: "mini", tag: "span" })).join("")}</span>
+        <span class="mini">${flipCards(app, ln.cards, p.id * 3)}</span>
         <span class="zstat">A <b>${ln.atk}</b> · B <b>${ln.blk}</b> · ${ln.len}f</span></div>`).join("")}
   </div>`;
 }
@@ -234,11 +256,12 @@ function handRow(app, v, me) {
   return `<div class="hand"><div class="hand-title">Your hand <span class="muted">(${esc(me.name)})</span></div><div class="hand-cards" data-act="hand">${cards.join("")}</div></div>`;
 }
 
-function coverScreen(app, v) {
+function coverScreen(app, v, sum) {
   const p = v.players[app.cover];
   return `<div class="cover" style="--c:${p.color}"><div class="cover-box">
     <img src="${p.img}" alt=""><h2>Pass the device to ${esc(p.name)}</h2>
     <p class="muted">${esc(stepName(v.pending?.step))}</p>
+    ${sum ? `<p class="small">${esc(sum.text)}</p>` : ""}
     <button class="primary" data-act="unlock" data-pid="${p.id}">I'm ${esc(p.name)}: show my hand</button></div></div>`;
 }
 

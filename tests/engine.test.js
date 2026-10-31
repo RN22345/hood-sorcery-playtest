@@ -7,6 +7,8 @@ import { rankEntries } from "../engine/rank.js";
 import { createGame, act, viewFor, replay, makeCtx } from "../engine/game.js";
 import { playOut } from "../engine/run.js";
 import { castProblem } from "../engine/cast.js";
+import { roundSummary } from "../engine/summary.js";
+import core from "../engine/modules/core.js";
 import { loadData } from "../engine/load-node.js";
 import matrix from "../engine/modules/matrix.js";
 import corners from "../engine/modules/corners.js";
@@ -137,4 +139,24 @@ test("views hide other hands, the rng and secret picks", () => {
   assert.equal(v.players[0].hand, null);
   assert.deepEqual(v.players[1].hand, hand);
   assert.deepEqual(v.pending.answers, {});
+});
+
+test("round end records held zones; round summary reports track changes and zones taken", () => {
+  const st = fakeState("corners", { 0: { atk: 1, blk: 1 }, 1: { atk: 1, blk: 1 }, 2: { atk: 1, blk: 1 } });
+  st.zones[0].holder = 1; st.zones[2].holder = 0;
+  st.players[1].tracks.rep = 3;
+  run(core, "roundEnd", st);
+  assert.deepEqual(st.players.map((p) => p.hist[0].holds), [[st.zones[2].name], [st.zones[0].name], []]);
+  // round 2: P3 takes corner 0 from P2, P1 drops corner 2 to nobody, P2 +1 Rep
+  st.round = 2;
+  st.zones[0].holder = 2; st.zones[2].holder = null;
+  st.players[1].tracks.rep = 4;
+  run(core, "roundEnd", st);
+  const s = roundSummary(st);
+  assert.equal(s.round, 2);
+  assert.deepEqual(s.items.map((i) => [i.pid, i.kind, i.delta ?? i.zone]), [
+    [0, "lose", st.zones[2].name], [1, "rep", 1], [2, "take", st.zones[0].name],
+  ]);
+  assert.equal(roundSummary(st, 1).text, `Round 1: ${st.players[0].name} took ${st.zones[2].name} · ${st.players[1].name} +3 Rep · ${st.players[1].name} took ${st.zones[0].name}`);
+  assert.equal(roundSummary({ ...st, players: st.players.map((p) => ({ ...p, hist: [] })) }), null);
 });

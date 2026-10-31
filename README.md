@@ -30,8 +30,11 @@ against bots, or online with a room code. No install, no account, no server.
 4. **Playing a round:** the Wheel spins by itself. On your turn click a **zone** (Corners: a corner), then
    click cards in your hand to add them to the line, in order. Click a card in the line to take it back.
    **+ Thumbs** commits Trigger Thumbs. **Lock in** lights up when the line is legal.
-5. **Rules** (top right) shows the rules of the mode you're playing. **Log** shows every roll and result.
-6. **At the end:** fill in the 4-question survey and press **Download game log**. Send the `.json` to QA:
+5. **After each round** the cards flip face up for a few seconds: each crew's line shows in its box, the
+   corners that changed hands glow, and a **round summary** line ("Round 3: Ana +1 damage · Ben took the Lot")
+   stays above the action panel. On a phone the hand scrolls sideways and sits at the bottom of the screen.
+6. **Rules** (top right) shows the rules of the mode you're playing. **Log** shows every roll and result.
+7. **At the end:** fill in the 4-question survey and press **Download game log**. Send the `.json` to QA:
    it holds the seed, every choice, the full log and the survey, and can be replayed exactly.
 
 Tips: the **seed** makes a game repeatable (same seed + same choices = same game). Bots let 1–2 testers run a

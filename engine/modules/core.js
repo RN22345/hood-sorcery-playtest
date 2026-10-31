@@ -175,7 +175,8 @@ export default {
       run(st, ctx) {
         for (const pl of st.players) {
           const r = st.res[pl.id] || { atk: 0, blk: 0, len: 0 };
-          pl.hist.push({ r: st.round, wheel: st.wheel, dmg: st.rd[pl.id], damage: pl.tracks.damage, rep: pl.tracks.rep, atk: r.atk, blk: r.blk, len: r.len, at: pl.at });
+          pl.hist.push({ r: st.round, wheel: st.wheel, dmg: st.rd[pl.id], damage: pl.tracks.damage, rep: pl.tracks.rep, atk: r.atk, blk: r.blk, len: r.len, at: pl.at,
+            holds: st.zones.filter((z) => z.holder === pl.id).map((z) => z.name) });
         }
         if (st.round < ctx.p.rounds) return;
         for (const m of ctx.mods) m.gameEnd?.(st, ctx);

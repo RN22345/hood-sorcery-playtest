@@ -24,8 +24,9 @@ const app = {
   localSeats: [], localCount: 0, focus: null, cover: null, unlocked: null,
   draft: { key: "", zone: 0, lines: {}, thumbs: [], pick: [] }, allowedZones: [], castProblem: null,
   net: { code: null, status: "", seatNames: {}, conn2seat: {} },
-  showLog: true, error: "", lobbyError: "", survey: { best: "", obvious: "", reads: "", fun: "" }, modal: null,
+  showLog: !window.matchMedia?.("(max-width: 900px)").matches, error: "", lobbyError: "", survey: { best: "", obvious: "", reads: "", fun: "" }, modal: null,
   botDelay: 220,
+  reveal: { seen: 0, until: 0, fresh: false }, // the few seconds after a round's cards flip
   modProblem(mode, m) { return modifierProblems(mode, m)[0] || ""; },
 };
 window.hsApp = app; // handy in the console while playtesting
@@ -70,6 +71,19 @@ function prepareDraft(v) {
   if (c?.type === "cast") app.castProblem = castProblem(v, makeCtx(v, app.data), v.you, draftCast());
 }
 
+// A round's lines become visible either mid-round (v.revealed, e.g. before Flip the Script) or, when
+// nothing is left to decide, only as last round's lines (v.lastRes). Either way: flip once, highlight a while.
+const REVEAL_MS = 6000;
+function trackReveal(v) {
+  const r = v.revealed ? v.round : v.lastRes ? v.round - 1 : 0;
+  if (r > app.reveal.seen) {
+    app.reveal = { seen: r, until: Date.now() + REVEAL_MS, fresh: true };
+    clearTimeout(app.revealTimer);
+    app.revealTimer = setTimeout(() => app.screen === "game" && render(), REVEAL_MS + 50);
+  }
+  app.revealing = Date.now() < app.reveal.until ? r : 0;
+}
+
 function draftCast() {
   return { lines: Object.entries(app.draft.lines).map(([z, cards]) => ({ zone: +z, cards })), thumbs: [...app.draft.thumbs] };
 }
@@ -83,7 +97,9 @@ function render() {
     const v = currentView();
     if (!v) { root.innerHTML = "<p class='muted'>Waiting for the host…</p>"; return; }
     prepareDraft(v);
+    trackReveal(v);
     html = V.game(app, v);
+    app.reveal.fresh = false; // the flip animates once; later renders keep only the highlights
   }
   if (app.modal) html += V.rulesModal(app, app.modal);
   root.innerHTML = html;
@@ -110,6 +126,7 @@ function startGame() {
   app.unlocked = null;
   app.survey = { best: "", obvious: "", reads: "", fun: "" };
   app.lobbyError = "";
+  app.reveal = { seen: 0, until: 0, fresh: false };
   changed();
 }
 
@@ -158,7 +175,8 @@ function submit(value) {
 
 function leave() {
   if (app.screen === "game" && app.st && !app.st.over && app.role !== "client" && !confirm("Leave this game?")) return;
-  clearTimeout(app.botTimer);
+  clearTimeout(app.botTimer); clearTimeout(app.revealTimer);
+  app.reveal = { seen: 0, until: 0, fresh: false };
   app.net.host?.close(); app.net.client?.close();
   Object.assign(app, { screen: "lobby", role: null, st: null, view: null, seat: null, remoteLobby: null, error: "" });
   app.net = { code: null, status: "", seatNames: {}, conn2seat: {} };

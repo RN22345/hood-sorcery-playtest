@@ -34,7 +34,8 @@ The printed rules authority is **SRD v3.10.20**; the modes here are playtest var
     the deck, the rng and secret picks), `botChoice`, `replay`.
   - `registry.js`: module table, `resolveMode(mode, modifiers, players)`, `stepsFor(config)`, phase order.
   - `line.js` (seams, finger budget, line enumeration), `rank.js` (SRD §5 ties and roll-offs),
-    `cast.js` (allowed zones, cast validation, bot helpers), `rng.js`.
+    `cast.js` (allowed zones, cast validation, bot helpers), `rng.js`, `summary.js` (one-line round summary
+    from `players[].hist`; reads only, decides nothing).
   - `modules/*.js`: one rule module each.
 - **Round = fixed phases**: `ROUND_START, PRE_CAST, CAST, PRE_REVEAL, REVEAL, RESOLVE, POST_RESOLVE, REFILL,
   ROUND_END`. Each module contributes **steps** `{ id, phase, order, kind: 'auto'|'choice', when, run | who,
@@ -101,6 +102,12 @@ in `registry.js` (`rounds 8, hand 8, thumbs 2, line 8, maxCards 3`).
   −2; Bleeding ranked as Classic; knocked off with nobody "in" → Block empty; no stay/bail in the last round.
 - **Call Out** picks are hidden and simultaneous (the app version from `11_Call_Out.md`), not in seat order.
 - **Pass the Tab** runs after the matrix and before Thumb 6; order = round damage, then worse combined rank.
+- Round history entries (`players[].hist`) carry `holds` (names of the zones held at round end), so a round
+  summary can say who took what without reading the log text. `engine/summary.js` builds the summary; it lives
+  in `engine/` (not `ui/`) because it is pure and unit-tested, and the Unity UI will want the same lines.
+- The reveal moment is UI-only: the engine usually runs straight from the flip to the next round's cast, so
+  the UI notices "a new round's lines became visible" (`v.revealed`, or `v.lastRes` one round later), flips
+  them once and keeps the highlights for 6 s. No engine pause, so bots and online play are not slowed.
 - Final-standings roll-off uses a d6 plus a hidden tiebreak digit so it never loops; the log shows the d6.
 
 ### Hosting: is GitHub Pages enough?
@@ -123,11 +130,12 @@ Sized so a cloud session can take them one by one. ✅ = done.
 **A. Playtest-critical**
 1. Online hardening: show who is connected in-game; host "replace a dropped player with a bot"; client
    reconnect button; heartbeat. Test across two real networks (phone hotspot + home Wi-Fi).
-2. Reveal moment: animate the flip (cards turn over), show each crew's line beside their box for a few seconds,
+2. ✅ Reveal moment: animate the flip (cards turn over), show each crew's line beside their box for a few seconds,
    highlight what changed (corner taken, damage +N). Today the log + dimmed "last round" lines carry it.
-3. A round summary strip ("Round 3: Ana +1 damage, Ben took the Lot…") above the action panel.
+3. ✅ A round summary strip ("Round 3: Ana +1 damage, Ben took the Lot…") above the action panel.
 4. Load a downloaded log and **replay** it step by step (engine `replay()` exists; needs UI).
-5. Mobile layout pass (hand as a horizontal scroller, compact player boxes) — testers will use phones.
+5. ✅ Mobile layout pass (hand as a horizontal scroller, compact player boxes) — testers will use phones.
+   Still to do: try it on a real phone (only checked in a 375 px browser window).
 
 **B. Modes and modifiers from the plan**
 6. **Corner location cards** for P1 (~12, `05_Pathways.md` P1): deal 3 per game; each a small rule hook
@@ -173,3 +181,18 @@ simulator before committing, and append to §6.
   Posted Up avg damage ~4.
 - Published 2026-10-31: public repo RN22345/hood-sorcery-playtest, GitHub Pages from `main` /. `CLOUD_PROMPT.md` holds the prompt for cloud sessions.
 - Not done: see §5. Not tested on phones or across two networks.
+
+### 2026-10-31 · Claude Code (cloud, Opus 5.5) · A2 reveal moment, A3 round summary, A5 mobile pass
+- **A3:** `engine/summary.js` `roundSummary(view)` → "Round 3: Ana +1 damage · Ben took Corner B · Cy left the
+  Block". `roundEnd` now records `holds` in each `hist` entry. Shown as a strip above the action panel and on the
+  hot-seat cover screen. New unit test (11 tests).
+- **A2:** when a round's lines become visible, the cards flip over (staggered), each crew's cast shows in its
+  player box with ATK/BLK, the box gets a +N/−N badge, corners that changed hands glow, and the summary strip
+  lights up; after 6 s the lines dim back to "last round". `prefers-reduced-motion` turns the flip off.
+- **A5:** ≤520 px: player boxes 2-up and compact, zones and line slots 1 column, hand is a sticky bottom bar
+  that scrolls sideways, solid top bar, smaller cards; the log starts closed on screens ≤900 px.
+- Verified: `npm test` passes; `node tools/simulate.mjs 50` runs clean (numbers as before). Playwright
+  (Chromium) at 1280 px and 375 px: lobby, 2 rounds of Corners vs bots, reveal + summary shown, no console
+  errors, no sideways scroll at 375 px.
+- Open: not tried on a real phone or in online play with a client (the reveal is driven by views, so it
+  should work the same). A1 (online hardening) and A4 (log replay) not started.
