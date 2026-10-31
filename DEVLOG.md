@@ -171,4 +171,5 @@ simulator before committing, and append to §6.
 - Bot sweep (50 games, 4p): Classic avg damage ~7 (printed playtest: 4–10); Corners avg Rep ~6;
   **Hold the Block avg damage ~2.3** (heal 2 may be too strong; try the "Block heals 1" modifier);
   Posted Up avg damage ~4.
+- Published 2026-10-31: public repo RN22345/hood-sorcery-playtest, GitHub Pages from `main` /. `CLOUD_PROMPT.md` holds the prompt for cloud sessions.
 - Not done: see §5. Not tested on phones or across two networks.
