@@ -10,6 +10,7 @@ import { lineStats } from "../engine/line.js";
 import { roundSummary } from "../engine/summary.js";
 import { LOCATIONS } from "../engine/modules/locations.js";
 import { audioSettings } from "./fx.js";
+import { resFor } from "./beats.js";
 
 export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const el = (e) => `<img class="el" src="assets/elements/${e}.png" alt="${e}">`;
@@ -125,27 +126,39 @@ function setupCrews(app) {
     <div class="crew-row">${seats}${add}</div>`;
 }
 
+const RULE_GROUPS = [["twist", "Round twists", "change what happens when lines flip"], ["length", "Game length and Thumbs", ""], ["mode", "Only for this mode", "tied to the corner, block or spot rules"]];
+
 function setupRules(app) {
   const { lob, modes, modifiers, net, data } = app;
   const mode = modes[lob.modeId];
-  const mods = Object.values(modifiers).map((m) => {
-    const why = app.modProblem(mode, m);
-    const on = lob.mods.includes(m.id) && !why;
-    return `<label class="rule ${why ? "off" : ""} ${on ? "on" : ""}" title="${esc(why || "")}">
-      <input type="checkbox" data-act="mod" value="${m.id}" ${on ? "checked" : ""} ${why ? "disabled" : ""}>
-      <span class="switch"></span><b>${esc(m.name)}</b><small>${esc(why || m.desc)}</small></label>`;
+  const all = Object.values(modifiers);
+  const row = (m) => {
+    const on = lob.mods.includes(m.id);
+    return `<label class="rule ${on ? "on" : ""}">
+      <input type="checkbox" data-act="mod" value="${m.id}" ${on ? "checked" : ""}>
+      <span class="switch"></span><b>${esc(m.name)}</b><small>${esc(m.desc)}</small></label>`;
+  };
+  const groups = RULE_GROUPS.map(([g, title, sub]) => {
+    const list = all.filter((m) => (m.group || "twist") === g && !app.modProblem(mode, m));
+    return list.length ? `<section class="rgroup"><h3>${title}${sub ? ` <small class="muted">${sub}</small>` : ""}</h3><div class="rule-list">${list.map(row).join("")}</div></section>` : "";
   }).join("");
+  const hidden = all.filter((m) => app.modProblem(mode, m));
   const online = lob.seats.some((s) => s.kind === "online");
   const missing = lob.seats.filter((s, i) => s.kind === "online" && !net.seatNames?.[i]).length;
   const ticked = lob.mods.filter((id) => modifiers[id] && !app.modProblem(mode, modifiers[id]));
+  const kindIcon = (k) => (k === "bot" ? "🤖 Bot" : k === "online" ? "🌐 Online" : "🙂 Human");
   return `<div class="rules-grid">
-    <div><h2 class="step-title">House rules <small class="muted">optional twists from the rework pathways</small></h2><div class="rule-list">${mods}</div></div>
+    <div class="rules-main"><h2 class="step-title">House rules <small class="muted">optional twists from the rework pathways</small></h2>
+      <div class="rules-scroll">${groups || '<p class="muted">No house rules fit this mode.</p>'}
+      ${hidden.length ? `<p class="muted small rhidden">Not used with ${esc(mode.name)}: ${hidden.map((m) => esc(m.name)).join(", ")}.</p>` : ""}</div></div>
     <aside class="summary-card">
       <div class="mode-art art-${MODE_ART[mode.id] || "corner"}"></div>
       <h3>${esc(mode.name)} <span class="tag">${esc(mode.pathway)}</span></h3>
-      <div class="sum-crews">${lob.seats.map((s, i) => `<span class="chip" style="--c:${data.crews[i].color}">${s.kind === "bot" ? "🤖" : s.kind === "online" ? "🌐" : "🙂"} ${esc(s.kind === "online" ? net.seatNames?.[i] || "online" : s.name || data.crews[i].name)}</span>`).join(" ")}</div>
-      <p class="small">${ticked.length ? ticked.map((id) => esc(modifiers[id].name)).join(" · ") : '<span class="muted">No house rules: the mode as written.</span>'}</p>
-      <div class="seed-row">
+      <div class="sum-block"><h4>Crews</h4>
+        ${lob.seats.map((s, i) => `<div class="sum-crew" style="--c:${data.crews[i].color}"><i></i><b>${esc(s.kind === "online" ? net.seatNames?.[i] || "online seat" : s.name || data.crews[i].name)}</b><span class="muted">${kindIcon(s.kind)}</span></div>`).join("")}</div>
+      <div class="sum-block"><h4>House rules</h4>
+        ${ticked.length ? ticked.map((id) => `<div class="sum-rule"><span>✓</span>${esc(modifiers[id].name)}</div>`).join("") : '<div class="muted small">None: the mode as written.</div>'}</div>
+      <div class="sum-block seed-row">
         <label class="rule mini ${lob.seedRandom ? "on" : ""}"><input type="checkbox" data-act="seedRandom" ${lob.seedRandom ? "checked" : ""}><span class="switch"></span>Random game</label>
         ${lob.seedRandom ? `<span class="muted small">a new shuffle every game</span>` : `<input data-act="seed" value="${esc(lob.seed)}" size="8" title="Same seed + same choices = same game"><button class="icon" data-act="reseed" title="Roll a new seed">🎲</button>`}
       </div>
@@ -200,6 +213,7 @@ export function settingsModal(app) {
       <label>Sound effects <input type="range" min="0" max="100" value="${Math.round(a.sfx * 100)}" data-act="vol" data-k="sfx"></label>
       <label class="rule mini ${a.muted ? "on" : ""}"><input type="checkbox" data-act="muteAll" ${a.muted ? "checked" : ""}><span class="switch"></span>Mute everything</label>
       <div><b>Round resolution</b> <small class="muted">how fast the table plays out what happened</small>${seg("speed", [["slow", "Slow"], ["normal", "Normal"], ["fast", "Fast"], ["instant", "Instant"]])}</div>
+      <div><b>Round results pop-up</b> <small class="muted">the ranking and Damage Matrix at the end of a round</small>${seg("results", [["auto", "Closes itself"], ["click", "Wait for a click"], ["off", "Off"]])}</div>
       <div><b>Scores</b> <small class="muted">show damage / Rep</small>${seg("pace", [["each", "One crew at a time"], ["together", "All at once"]])}</div>
       <div><b>Bots</b> <small class="muted">how long they think</small>${seg("botSpeed", [["slow", "Slow"], ["normal", "Normal"], ["fast", "Fast"]])}</div>
     </div>`;
@@ -269,28 +283,34 @@ export function game(app, v, opts = {}) {
   const round = disp.round ?? v.round;
   const sum = roundSummary(v);
   const hot = !busy && app.revealing && sum?.round === app.revealing ? sum : null; // what changed in the round just played
-  const opps = pl.filter((p) => p !== me);
   const title = `${v.mode.name}${v.mode.modifiers.length ? " + " + v.mode.modifiers.map((id) => app.modifiers[id]?.name || id).join(", ") : ""}`;
+  const htb = v.mode.id === "hold-the-block";
+  const holderId = htb ? (disp.holders && v.zones[0]?.name in disp.holders ? disp.holders[v.zones[0].name] : v.zones[0]?.holder) : null;
   const side = `
-    <div class="roundbox"><span class="muted">Round</span><b>${round || "–"}</b><span class="muted">of ${v.mode.params.rounds}</span></div>
-    ${sector ? `<div class="wheelbox ${sector.type}"><img src="${sector.img}" alt=""><b>${esc(sector.name)}</b>${v.fx !== sector.effect && sector.id === v.wheel ? `<small class="muted">${esc(v.mode.name)} reading</small>` : ""}<p>${esc(sector.id === v.wheel ? fxText(v, sector) : sector.text)}</p></div>` : `<div class="wheelbox"><div class="wheel-wait"></div><b class="muted">The Wheel…</b></div>`}
-    <div class="limits"><span>Line <b>${v.limits?.line}</b></span><span>Cards <b>${v.limits?.maxCards}</b></span><span class="deck">${backs(1)} <b>${v.deckCount}</b></span></div>
+    <div class="roundrow">
+      <div class="roundbox"><span class="muted">Round</span><b>${round || "–"}</b><span class="muted">of ${v.mode.params.rounds}</span></div>
+      <div class="limits"><span>Line <b>${v.limits?.line}</b></span><span>Cards <b>${v.limits?.maxCards}</b></span><span class="deck">${backs(1)} <b>${v.deckCount}</b></span></div>
+    </div>
+    ${sector ? `<div class="wheelbox ${sector.type}"><img src="${sector.img}" alt=""><div class="wtext"><b>${esc(sector.name)}</b>${v.fx !== sector.effect && sector.id === v.wheel ? `<small class="muted">${esc(v.mode.name)} reading</small>` : ""}<p>${esc(sector.id === v.wheel ? fxText(v, sector) : sector.text)}</p></div></div>` : `<div class="wheelbox"><div class="wheel-wait"></div><div class="wtext"><b class="muted">The Wheel…</b></div></div>`}
     ${v.stake > 1 || v.folded?.length ? `<div class="stake">Stakes <b>×${v.stake}</b>${v.folded?.length ? ` · folded ${v.folded.map((id) => esc(pl[id].name)).join(", ")}` : ""}</div>` : ""}
+    <div class="crews">${pl.map((p) => playerBox(app, v, p, track, hot, holderId)).join("")}</div>
     ${netStrip(app)}
     ${opts.side || ""}`;
-  const narrator = show.cur ? `<div class="narrator ${show.fresh ? "enter" : ""} t-${show.cur.type}">${captionHtml(v, show.cur)}</div>` : "";
+  const popup = show.res && (busy || !v.over) ? resultsPopup(app, v) : "";
+  const quiet = (popup && show.cur?.type === "rank") || (show.cur && !show.cur.caption); // the popup says it better than a caption
+  const strip = busy
+    ? `<div class="narrator ${quiet ? "ghost" : ""} t-${show.cur?.type}" data-k="b${show.seq}">${show.cur && !quiet ? captionHtml(v, show.cur) : ""}</div>`
+    : summaryStrip(v, sum, hot, busy);
   const board = v.over && !opts.panel && !busy
     ? endPanel(app, v)
-    : `<div class="zones n${v.zones.length}">${v.zones.map((z) => zoneBox(app, v, z, hot)).join("")}</div>${narrator}${summaryStrip(v, sum, hot, busy)}${opts.panel || (busy ? resolvingPanel(app) : actionPanel(app, v))}`;
+    : `<div class="arena"><div class="zones n${v.zones.length} c${pl.length}">${v.zones.map((z) => zoneBox(app, v, z, hot, holderId)).join("")}</div>${popup}</div>${strip}${opts.panel || (busy ? resolvingPanel(app) : actionPanel(app, v, holderId))}`;
   const hand = me && me.hand ? handRow(app, v, me, busy)
     : app.cover == null && app.localCount > 1 && !v.over ? `<div class="hand hidden-hand muted">Hands are hidden between turns (pass-and-play).</div>` : "";
-  const cls = [app.showLog ? "with-log" : "", app.revealing ? "revealing" : "", show.fresh && show.cur?.type === "reveal" ? "fresh" : "", me ? "has-me" : "no-me", `opp${opps.length}`, busy ? "busy" : "", app.drag ? "dragging-on" : "", `mode-${v.mode.id}`].join(" ");
+  const cls = [app.showLog ? "with-log" : "", app.revealing ? "revealing" : "", show.cur?.type === "reveal" ? "fresh" : "", me ? "has-me" : "no-me", `crews${pl.length}`, busy ? "busy" : "", app.drag ? "dragging-on" : "", `mode-${v.mode.id}`, htb && me ? (holderId === me.id ? "role-holder" : "role-street") : ""].join(" ");
   return `<div class="game ${cls}">
     ${topbar(app, title)}
     <aside class="side">${side}</aside>
-    <section class="opps">${opps.map((p) => playerBox(app, v, p, track, hot)).join("")}</section>
     <section class="board">${board}</section>
-    <section class="mine">${me ? playerBox(app, v, me, track, hot) : ""}</section>
     <section class="handarea">${hand}</section>
     ${app.showLog ? `<aside class="log">${logHtml(v)}</aside>` : ""}
     ${app.cover != null && !busy ? coverScreen(app, v, sum) : ""}
@@ -311,11 +331,11 @@ const flipCards = (app, ids, start = 0) => ids.map((id, i) => `<span class="flip
 
 function summaryStrip(v, sum, hot, busy) {
   if (busy) return "";
-  if (!sum) return `<div class="summary muted">The Vein is waiting. First round.</div>`;
+  if (!sum) return `<div class="summary muted">${v.revealed ? "The lines are up." : "The Vein is waiting. First round."}</div>`;
   const items = sum.items.length
     ? sum.items.map((i) => `<span class="sum-item ${i.kind}" style="--c:${v.players[i.pid].color}">${esc(i.text)}</span>`).join("")
     : `<span class="muted">no change</span>`;
-  return `<div class="summary ${hot ? "hot" : ""}" title="${esc(sum.text)}"><b>Round ${sum.round}</b>${items}</div>`;
+  return `<div class="summary ${hot ? "hot" : ""}" title="${esc(sum.text)}"><b>Round ${sum.round}</b>${items}<span class="grow"></span><button class="link" data-act="showResults" data-r="${sum.round}">Results</button></div>`;
 }
 
 // Online games: who is connected. The host can hand a dropped seat to a bot (and back); a client can reconnect.
@@ -347,7 +367,7 @@ function fxText(v, sector) {
   return custom[v.fx] || sector.text;
 }
 
-function playerBox(app, v, p, track, hot) {
+function playerBox(app, v, p, track, hot, holderId) {
   const show = app.show, disp = show.disp || {};
   const shownRound = disp.shownRound ?? resRound(v);
   const r = v.revealed && shownRound >= v.round ? v.res[p.id] : null;
@@ -358,23 +378,25 @@ function playerBox(app, v, p, track, hot) {
   const mine = hot ? hot.items.filter((i) => i.pid === p.id) : [];
   const shown = (app.revealing || show.busy) && shownRound >= resRound(v) ? resOf(v)?.[p.id] : null;
   const ranks = disp.ranks;
-  const rank = ranks?.atk.includes(p.id) ? `<div class="rank-badges"><span class="rb atk">ATK #${ranks.atk.indexOf(p.id) + 1}</span><span class="rb blk">BLK #${ranks.blk.indexOf(p.id) + 1}</span></div>` : "";
+  const rank = ranks?.atk.includes(p.id) ? `<span class="rb atk">ATK #${ranks.atk.indexOf(p.id) + 1}</span><span class="rb blk">BLK #${ranks.blk.indexOf(p.id) + 1}</span>` : "";
   const focus = show.cur?.pids?.includes(p.id);
   const isMe = p.id === v.you;
+  const isHolder = holderId === p.id;
   const score = disp.scores?.[p.id] ?? p.tracks[track];
-  return `<div class="pbox ${isMe ? "me" : ""} ${mine.length ? "changed" : ""} ${deciding && !done ? "thinking" : ""} ${focus ? "focus" : ""}" data-pid="${p.id}" style="--c:${p.color}">
+  const state = deciding ? `<span class="state ${done ? "done" : ""}">${done ? "✔ locked in" : `${esc(stepName(pend.step))}<span class="dots3"><i>.</i><i>.</i><i>.</i></span>`}</span>` : "";
+  const holdsTxt = holderId == null && holds.length ? `<span class="holds">Holds ${holds.map((z) => esc(z.name)).join(", ")}</span>` : "";
+  const at = p.at != null && v.mode.zones.castInto === "chosen" ? `<span>At <b>${esc(v.zones[p.at]?.name)}</b></span>` : "";
+  const totals = shown ? `<span class="tot"><b class="a">${shown.atk}</b>/<b class="b">${shown.blk}</b></span>` : r ? `<span class="totals">A <b>${r.atk}</b> B <b>${r.blk}</b></span>` : "";
+  const extra = [isHolder ? '<span class="crown">👑 HOLDER</span>' : "", holdsTxt, at, totals, rank].filter(Boolean).join("");
+  return `<div class="pbox ${isMe ? "me" : ""} ${isHolder ? "holder" : ""} ${mine.length ? "changed" : ""} ${deciding && !done ? "thinking" : ""} ${focus ? "focus" : ""}" data-pid="${p.id}" style="--c:${p.color}">
     <img class="standee" src="${p.img}" alt="">
     <div class="pinfo">
-      <div class="pname">${esc(p.name)}${p.kind === "bot" ? ' <small class="muted">bot</small>' : ""}</div>
-      <div class="score"><b>${score}</b> <span class="muted">${unitOf(track)}</span></div>
-      <div class="small">${dots(p.thumbs, v.mode.params.thumbs)} <span class="muted">Thumbs</span>${isMe ? "" : ` ${backs(Math.min(p.handCount, 8))}`}</div>
-      ${p.at != null && v.mode.zones.castInto === "chosen" ? `<div class="small">At <b>${esc(v.zones[p.at]?.name)}</b></div>` : ""}
-      ${holds.length ? `<div class="small holds">Holds ${holds.map((z) => esc(z.name)).join(", ")}</div>` : ""}
-      ${r && !shown ? `<div class="small totals">ATK <b>${r.atk}</b> · BLK <b>${r.blk}</b> · ${r.len}f</div>` : ""}
-      ${shown ? `<div class="pline"><small class="tot"><b class="a">${shown.atk}</b>/<b class="b">${shown.blk}</b></small></div>` : ""}
-      ${rank}
-      ${deciding ? `<div class="state ${done ? "done" : ""}">${done ? "✔ locked in" : `${esc(stepName(pend.step))}<span class="dots3"><i>.</i><i>.</i><i>.</i></span>`}</div>` : ""}
-    </div></div>`;
+      <div class="pname">${esc(p.name)}${p.kind === "bot" ? ' <small class="muted">bot</small>' : ""}${isMe ? ' <span class="you">YOU</span>' : ""}</div>
+      <div class="pmeta">${dots(p.thumbs, v.mode.params.thumbs)} <span class="muted">Thumbs</span>${state}</div>
+      ${extra ? `<div class="pextra">${extra}</div>` : ""}
+    </div>
+    <div class="score"><b>${score}</b><span class="muted">${unitOf(track)}</span></div>
+  </div>`;
 }
 
 function zoneArt(v, z) {
@@ -385,29 +407,102 @@ function zoneArt(v, z) {
   return "corner";
 }
 
-function zoneBox(app, v, z, hot) {
+function zoneBox(app, v, z, hot, holderIdNow) {
   const show = app.show, disp = show.disp || {};
-  const holderId = disp.holders && z.name in disp.holders ? disp.holders[z.name] : z.holder;
+  const htb = v.mode.id === "hold-the-block";
+  const holderId = htb ? holderIdNow : disp.holders && z.name in disp.holders ? disp.holders[z.name] : z.holder;
   const holder = holderId != null ? v.players[holderId] : null;
   const res = resOf(v);
   const faceUp = (disp.shownRound ?? resRound(v)) >= resRound(v);
   const past = !v.revealed && !app.revealing && !show.busy; // last round's lines, dimmed once the moment is over
   const taken = hot?.items.some((i) => i.kind === "take" && i.zone === z.name);
-  const lines = res ? v.players.map((p) => ({ p, ln: res[p.id]?.lines.find((l) => l.zone === z.i) })).filter((x) => x.ln) : [];
+  const lineOf = (p) => res?.[p.id]?.lines.find((l) => l.zone === z.i);
+  const lane = (p, ln) => `<div class="zline ${past ? "past" : ""} ${ln ? "" : "none"}" data-k="ln${p.id}" style="--c:${p.color}">
+      <div class="lhead"><span class="chip">${esc(p.name)}</span>${ln && faceUp ? `<span class="zstat">A <b>${ln.atk}</b> B <b>${ln.blk}</b> · ${ln.len}f</span>` : ""}</div>
+      <div class="lcards">${ln ? (faceUp ? flipCards(app, ln.cards, p.id * 3) : ln.cards.map(() => back()).join("")) : '<span class="muted small">–</span>'}</div></div>`;
   const posted = v.mode.zones.castInto === "chosen" ? v.players.filter((p) => p.at === z.i) : [];
   const opened = v.open ? v.players.filter((p) => v.open[p.id]?.zone === z.i) : [];
   const loc = z.loc ? LOCATIONS[z.loc] : null;
   const focus = show.cur?.zones?.includes(z.name);
-  return `<div class="zone art-${zoneArt(v, z)} ${z.rich ? "rich" : ""} ${z.extra ? "extra" : ""} ${taken ? "taken" : ""} ${focus ? "focus" : ""} ${lines.length >= 4 ? "crowded" : ""}" data-zone="${esc(z.name)}" style="${holder ? `--h:${holder.color}` : ""}">
+  const lanes = v.players.map((p) => ({ p, ln: lineOf(p) })).filter((x) => x.ln);
+  let body;
+  if (htb) {
+    // the Block is a duel: the holder sits apart from the Street, so roles are obvious at a glance
+    const street = v.players.filter((p) => p.id !== holderId);
+    body = `<div class="htb">
+      <div class="hpane ${holder ? "" : "vacant"}"><div class="phead"><span class="crownbig">👑</span> Holder${holder && holder.id === v.you ? ' <small>(you)</small>' : ""}</div>
+        ${holder ? lane(holder, lineOf(holder)) : '<div class="empty-block">The Block is empty<small>highest ATK takes it</small></div>'}</div>
+      <div class="spane"><div class="phead">The Street <small>knock the holder off</small></div>
+        <div class="slanes">${street.map((p) => lane(p, lineOf(p))).join("")}</div></div>
+    </div>`;
+  } else if (v.mode.id === "classic" && !lanes.length) {
+    // nobody has cast yet: show who is at the table and who has locked in, instead of an empty tile
+    const pend = show.busy ? null : v.pending;
+    body = `<div class="zlines">${v.players.map((p) => `<div class="zline none" data-k="ln${p.id}" style="--c:${p.color}"><div class="lhead"><span class="chip">${esc(p.name)}</span></div><div class="lcards"><span class="muted">${pend?.done.includes(p.id) ? "✔ locked in" : pend?.who.includes(p.id) ? "casting…" : "waiting"}</span></div></div>`).join("")}</div>`;
+  } else body = `<div class="zlines">${lanes.map(({ p, ln }) => lane(p, ln)).join("")}</div>`;
+  return `<div class="zone art-${zoneArt(v, z)} ${z.rich ? "rich" : ""} ${z.extra ? "extra" : ""} ${taken ? "taken" : ""} ${focus ? "focus" : ""} ${lanes.length >= 4 ? "crowded" : ""}" data-zone="${esc(z.name)}" style="${holder ? `--h:${holder.color};` : ""}--lanes:${Math.max(2, lanes.length)}">
     <div class="zhead"><b>${esc(z.name)}</b>${z.rich ? ' <span class="badge">★ rich</span>' : ""}
-      ${v.mode.id === "classic" ? "" : `<span class="holder">${holder ? chip(holder) : '<span class="muted">unclaimed</span>'}</span>`}</div>
+      ${v.mode.id === "classic" || htb ? "" : `<span class="holder">${holder ? chip(holder) : '<span class="muted">unclaimed</span>'}</span>`}</div>
     ${loc ? `<div class="loc" title="${esc(loc.text)}"><img src="assets/locations/${z.loc}.svg" alt="" onerror="this.remove()"><b>${esc(loc.name)}</b> ${esc(loc.text)}</div>` : ""}
     ${posted.length && !v.revealed ? `<div class="posted">${posted.map(chip).join(" ")}</div>` : ""}
     ${opened.length && !v.revealed ? `<div class="opened">${opened.map((p) => `<span class="zline">${chip(p)} ${card(app.data.cardMap[v.open[p.id].card], { cls: "mini", tag: "span" })}<small class="muted">opened</small></span>`).join("")}</div>` : ""}
-    <div class="zlines">${lines.map(({ p, ln }) => `<div class="zline ${past ? "past" : ""}" style="--c:${p.color}">
-        <span class="chip" style="--c:${p.color}">${esc(p.name)}</span>
-        <span class="mini">${faceUp ? flipCards(app, ln.cards, p.id * 3) : ln.cards.map(() => back()).join("")}</span>
-        ${faceUp ? `<span class="zstat">A <b>${ln.atk}</b> B <b>${ln.blk}</b> ${ln.len}f</span>` : ""}</div>`).join("")}</div>
+    ${body}
+  </div>`;
+}
+
+// Round results (pop-up over the board): every crew's line totals, the ranking and, in matrix modes, the printed
+// Damage Matrix with each crew's token on its cell. It opens at the narrator's "totals" beat and fills in as the
+// round plays out; closes by itself, or on a click. It only displays what the engine logged.
+function resultsPopup(app, v) {
+  const show = app.show, N = show.res.round, res = resFor(v, N);
+  if (!res) return "";
+  const done = !show.busy;
+  const rk = v.log.findLast((e) => e.k === "rank" && e.r === N);
+  const ranks = rk && (done || show.disp?.ranks) ? rk.ranks : null;
+  const sum = roundSummary(v, N);
+  const track = v.mode.win.track;
+  const rankOf = (kind, pid) => (ranks ? ranks[kind].indexOf(pid) : -1);
+  const ord = [...v.players].sort((a, b) => (ranks ? rankOf("atk", a.id) - rankOf("atk", b.id) : a.id - b.id));
+  const resultOf = (p) => {
+    if (!sum) return '<span class="muted">…</span>';
+    if (v.folded?.includes(p.id) && rk && !ranks?.atk.includes(p.id)) return '<span class="muted">folded</span>';
+    const items = sum.items.filter((i) => i.pid === p.id);
+    return items.length ? items.map((i) => `<span class="ri ${i.kind === "damage" ? (i.delta > 0 ? "bad" : "good") : i.kind === "rep" ? (i.delta > 0 ? "good" : "bad") : "take"}">${esc(i.text.slice(p.name.length + 1))}</span>`).join("") : `<span class="muted">${track === "damage" ? "no damage" : "no change"}</span>`;
+  };
+  const rows = ord.map((p) => {
+    const r = res[p.id], cards = (r?.lines || []).flatMap((l) => l.cards);
+    return `<div class="rrow" data-k="rr${p.id}" style="--c:${p.color}">
+      <img class="rstand" src="${p.img}" alt=""><b class="rname">${esc(p.name)}</b>
+      <span class="rcards">${cards.map((id) => card(app.data.cardMap[id], { cls: "mini", tag: "span" })).join("")}</span>
+      <span class="rstat a">ATK <b>${r?.atk ?? "–"}</b>${ranks?.atk.includes(p.id) ? `<i>#${rankOf("atk", p.id) + 1}</i>` : ""}</span>
+      <span class="rstat b">BLK <b>${r?.blk ?? "–"}</b>${ranks?.blk.includes(p.id) ? `<i>#${rankOf("blk", p.id) + 1}</i>` : ""}</span>
+      <span class="rres">${resultOf(p)}</span></div>`;
+  }).join("");
+  let matrix = "";
+  if (rk?.m) {
+    const n = rk.ranks.atk.length, M = rk.m, nth = (i) => ["1st", "2nd", "3rd", "4th"][i];
+    const tokens = ranks ? Object.fromEntries(rk.ranks.atk.map((pid) => [`${rankOf("atk", pid)},${rankOf("blk", pid)}`, v.players[pid]])) : {};
+    const cells = [`<div class="mh corner">ATK ↓ &nbsp; BLK →</div>`, ...Array.from({ length: n }, (_, b) => `<div class="mh">${nth(b)}</div>`)];
+    for (let a = 0; a < n; a++) {
+      cells.push(`<div class="mh">${nth(a)}</div>`);
+      for (let b = 0; b < n; b++) {
+        const t = tokens[`${a},${b}`];
+        cells.push(`<div class="mc d${Math.min(M[a][b] * (rk.stake || 1), 4)} ${t ? "hit" : ""}" ${t ? `style="--c:${t.color}"` : ""}><i>${M[a][b] * (rk.stake || 1)}</i>${t ? `<img src="${t.img}" alt="${esc(t.name)}" title="${esc(t.name)}">` : ""}</div>`);
+      }
+    }
+    matrix = `<div class="matrix"><h3>Damage Matrix${rk.stake > 1 ? ` <span class="badge">stakes ×${rk.stake}</span>` : ""}</h3>
+      <div class="mgrid" style="--n:${n}">${cells.join("")}</div>
+      <p class="muted small">Your ATK rank down the side, BLK rank across: the number is the damage that cell deals.</p></div>`;
+  }
+  const quiet = new Set(["reveal", "round", "wheel", "cast", "rank", "dmg", "shuffle", "setup", "swap", "flip", "seat"]);
+  const extra = v.log.filter((e) => e.r === N && !quiet.has(e.k) && !(e.zone && "holder" in e)).slice(-3);
+  const wheel = v.log.findLast((e) => e.r === N && e.k === "wheel");
+  const wsec = wheel && app.data.wheel.find((w) => w.id === wheel.id);
+  return `<div class="results ${matrix ? "with-matrix" : ""}" data-k="res${N}" data-act="closeResults" title="Click to close">
+    <div class="res-head"><h2>Round ${N} results</h2>${wsec ? `<span class="wtag ${wsec.type}"><img src="${wsec.img}" alt="">${esc(wsec.name)}</span>` : ""}<span class="grow"></span>
+      ${done ? "" : '<span class="muted small">resolving…</span>'}<button class="primary" data-act="closeResults">Continue ▶</button></div>
+    <div class="res-body"><div class="rtable">${rows}</div>${matrix}</div>
+    ${extra.length ? `<ul class="res-extra">${extra.map((e) => `<li>${esc(e.text)}</li>`).join("")}</ul>` : ""}
   </div>`;
 }
 
@@ -420,7 +515,7 @@ function resolvingPanel(app) {
   </div>`;
 }
 
-function actionPanel(app, v) {
+function actionPanel(app, v, holderId) {
   const c = v.choice;
   const err = app.error ? `<p class="err">${esc(app.error)}</p>` : "";
   if (!c) {
@@ -430,20 +525,28 @@ function actionPanel(app, v) {
     return `<div class="panel waiting"><span class="muted">${esc(stepName(pend.step))}:</span> waiting for ${waiting.map(chip).join(" ")}<span class="dots3"><i>.</i><i>.</i><i>.</i></span>${err}</div>`;
   }
   if (c.type === "option") {
-    return `<div class="panel choice"><p class="prompt">${esc(c.prompt)}</p>
+    return `<div class="panel choice" data-k="${app.draft.key}"><p class="prompt">${esc(c.prompt)}</p>
       <div class="opts">${c.options.map((o, i) => `<button class="opt" data-act="opt" data-i="${i}"><b>${esc(o.label)}</b>${o.hint ? `<small>${esc(o.hint)}</small>` : ""}</button>`).join("")}</div>${err}</div>`;
   }
   if (c.type === "pickCards") {
     const n = app.draft.pick.length;
-    return `<div class="panel choice"><p class="prompt">${esc(c.prompt)}</p>
+    return `<div class="panel choice" data-k="${app.draft.key}"><p class="prompt">${esc(c.prompt)}</p>
       <p>Picked <b>${n}</b>/${c.count}: click cards in your hand.</p>
       <button class="primary big" data-act="pickDone" ${n !== c.count ? "disabled" : ""}>Pass them</button>${err}</div>`;
   }
-  if (c.type === "cast") return castPanel(app, v, c, err);
+  if (c.type === "cast") return castPanel(app, v, c, err, holderId);
   return "";
 }
 
-function castPanel(app, v, c, err) {
+// Hold the Block: say which side you are on, every round, right where you build your line.
+function roleBanner(v, holderId) {
+  if (v.mode.id !== "hold-the-block" || v.you == null) return "";
+  if (holderId == null) return `<span class="role vacant">The Block is empty: the highest ATK takes it</span>`;
+  if (holderId === v.you) return `<span class="role holder">👑 You hold the Block: defend it</span>`;
+  return `<span class="role street">You are on the Street: knock ${esc(v.players[holderId].name)} off</span>`;
+}
+
+function castPanel(app, v, c, err, holderId) {
   const d = app.draft;
   const zones = app.allowedZones;
   const slots = zones.map((zi) => {
@@ -461,9 +564,9 @@ function castPanel(app, v, c, err) {
   const fingers = Object.values(d.lines).reduce((a, ids) => a + lineStats(ids.map((id) => app.data.cardMap[id])).len, 0);
   const me = v.players[v.you];
   const pct = Math.min(100, (fingers / c.limits.line) * 100);
-  return `<div class="panel choice cast"><p class="prompt">${esc(c.prompt)} <span class="muted">Drag cards into ${zones.length > 1 ? "a zone" : "your line"}; drag them back to undo.</span></p>
+  return `<div class="panel choice cast" data-k="${app.draft.key}"><p class="prompt">${roleBanner(v, holderId)}${esc(c.prompt)} <span class="muted">Drag cards into ${zones.length > 1 ? "a zone" : "your line"}; drag them back to undo.</span></p>
     <div class="castrow">
-      <div class="slots">${slots}</div>
+      <div class="slots s${zones.length}">${slots}</div>
       <div class="meter">
         <div class="fingers ${fingers > c.limits.line ? "bad" : ""}"><span>Fingers <b>${fingers}</b>/${c.limits.line}</span><i style="width:${pct}%"></i></div>
         <span>Cards <b class="${used.length > c.limits.maxCards ? "bad" : ""}">${used.length}</b>/${c.limits.maxCards}</span>
@@ -488,7 +591,7 @@ function handRow(app, v, me, busy) {
 
 function coverScreen(app, v, sum) {
   const p = v.players[app.cover];
-  return `<div class="cover" style="--c:${p.color}"><div class="cover-box">
+  return `<div class="cover" data-k="cover${p.id}" style="--c:${p.color}"><div class="cover-box">
     <img src="${p.img}" alt=""><h2>Pass the device to ${esc(p.name)}</h2>
     <p class="muted">${esc(stepName(v.pending?.step))}</p>
     ${sum ? `<p class="small">${esc(sum.text)}</p>` : ""}

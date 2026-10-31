@@ -64,8 +64,13 @@ The printed rules authority is **SRD v3.10.20**; the modes here are playtest var
   - **Stage** (`stage.js`): every screen is laid out on a **1920×1080 stage** scaled to fit the window
     (letterboxed), the same model as a Unity Canvas Scaler with a 1920×1080 reference. Desktop from 480p to
     4K shows everything without scrolling. Narrow or portrait windows (`body.flow`) get a scrolling layout.
-    Screen regions (game): top bar · side (round, Wheel, limits, connections) · opponents · board (zones,
-    round summary, action panel) · your crew · your hand (a fan) · log. These map one-to-one to Unity panels.
+    Screen regions (game): top bar · side (round + limits, Wheel, **the crews as a slim scoreboard**,
+    connections) · board (zones/lanes with a results pop-up over them, narrator/summary strip, action panel) ·
+    your hand (a fan under the board) · log. These map one-to-one to Unity panels.
+  - **Rendering** (`morph.js`): a screen is *diffed* into the DOM, not replaced, so a click (sound button, modal,
+    settings) never restarts running animations. Keyed elements (`data-k`, `data-card`, `data-pid`, `data-zone`)
+    are matched by key; a changed `data-k` (a new stage page, a new choice, a new narrator beat, a new results
+    pop-up) is a new element, which is what plays its entry animation. Never rebuild `#app` with `innerHTML`.
   - **Effects + audio** (`fx.js`): banners, the Wheel reel, floating numbers, claim flashes, dice; sound
     effects from CC0 samples (`assets/audio/`, Web Audio) and looping lo-fi music (menu / game), with volumes
     in Settings. A separate layer outside `#app`, so re-renders never restart an animation.
@@ -174,6 +179,11 @@ in `registry.js` (`rounds 8, hand 8, thumbs 2, line 8, maxCards 3`).
 - **Log entries carry structured fields** for presentation (`d`, `ds`, `zone`, `holder`, `ranks`, `id`, `pid`).
   They are not rules and do not change replays; the Unity port can drive its own animations from them.
 - Seeds are random per game by default (*Random game* toggle in house rules); a fixed seed is still possible.
+- **Round results pop-up (2026-10-31):** opens when a round starts to resolve (first rank / claim / damage beat),
+  covers only the zones (the action panel and hand stay usable, so Flip the Script, Pass the Tab or stay/bail
+  are never hidden), and a `hold` beat keeps it up ~3 s before the next round starts. The matrix grid is drawn from
+  the `m` / `stake` fields now logged on the `rank` entry (not a rule change); who took what comes from
+  `roundSummary`. Settings: closes itself / wait for a click / off.
 - Final-standings roll-off uses a d6 plus a hidden tiebreak digit so it never loops; the log shows the d6.
 
 ### Hosting: is GitHub Pages enough?
@@ -385,3 +395,27 @@ simulator before committing, and append to §6.
   - An original music theme.
   - The opponents' card-back stacks read a little like a barcode at small sizes.
   - Possibly a hover preview (big card) and drag-to-cast for Swap Meet picks.
+
+### 2026-10-31 · Claude Code (cloud, Sonnet 5.5) · Playtest feedback pass: no animation resets, layout, results pop-up, Block holder, house rules
+- **Animation resets (root cause):** `render()` rebuilt `#app` with `innerHTML` on every click, so every CSS animation
+  (menu, Wheel, thinking pulse, hover transitions) restarted, and opening/closing Settings replayed the whole screen.
+  New `ui/morph.js` diffs the new HTML into the live DOM. Verified in Chromium: menu animation clocks keep running
+  while spamming the sound button; the Wheel's `bob` clock is continuous across opening and closing Settings; the
+  wheel box, scoreboard rows, hand cards and cast panel keep their element identity across renders.
+- **Layout:** the crews are now a slim scoreboard in the left column (standee, name, Thumbs, one big score; opponent
+  card-back stacks removed); the board and hand get the rest. Cast cards are bigger everywhere (lanes scale to the
+  room, up to ~140 px in Classic; in the cast panel 100 px; hand 146 px), Classic shows one lane per crew in a 2×2
+  grid, and the narrator is an inline strip instead of an overlay that hid the lanes. Round 1 shows who has locked in.
+- **Round results pop-up** (see §4): per-crew line, ATK/BLK with rank, result chips (+2 damage, took the Block…),
+  the Damage Matrix with each crew's token (Classic / Posted Up), extra log lines. `rank` log entries now carry `m`
+  and `stake`. New `hold` beat; new setting; unit test added (23 tests).
+- **Hold the Block:** the Block zone is split into a gold *Holder* pane (👑) and a blue *Street* pane; the holder's
+  scoreboard row is gold with a HOLDER tag; the cast panel carries a role banner (holder / Street / empty Block).
+- **House rules page:** rules grouped (Round twists / Game length and Thumbs / Only for this mode), rules that don't
+  fit the mode listed in one muted line instead of greyed cards, and a structured summary card (crew list, active
+  rules, seed). `data/modifiers.json` gained a `group` field.
+- Verified: `npm test` (23) and `node tools/simulate.mjs 50` pass; Playwright at 1920×1080, 1280×720 and 390 px:
+  setup wizard, Classic / Hold the Block / Corners / Posted Up rounds with popups, drag-and-drop, log, stats,
+  settings and rules modals, no console errors.
+- Open: the lo-fi music doesn't fit the theme (ART_TODO); a real phone; the results pop-up for Corners shows the
+  table only (no matrix there by design).

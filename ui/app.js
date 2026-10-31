@@ -16,6 +16,7 @@ import { statsPanel, statsImage } from "./statsView.js";
 import "./stage.js";
 import { sound, toggleMute, clearFx, music, setAudio } from "./fx.js";
 import { Presenter } from "./show.js";
+import { morph } from "./morph.js";
 
 const root = document.getElementById("app");
 const getJson = (p) => fetch(p).then((r) => { if (!r.ok) throw new Error(`${p}: ${r.status}`); return r.json(); });
@@ -32,7 +33,7 @@ const app = {
   draft: { key: "", zone: 0, lines: {}, thumbs: [], pick: [] }, allowedZones: [], castProblem: null,
   net: { code: null, status: "", seatNames: {}, conn2seat: {} },
   showLog: false, error: "", lobbyError: "", survey: { best: "", obvious: "", reads: "", fun: "" }, modal: null,
-  settings: Object.assign({ speed: "normal", pace: "each", botSpeed: "normal" }, store.get("settings", {})),
+  settings: Object.assign({ speed: "normal", pace: "each", botSpeed: "normal", results: "auto" }, store.get("settings", {})),
   revealing: 0, drag: null, handOrder: [],
   modProblem(mode, m) { return modifierProblems(mode, m)[0] || ""; },
   netSeats: () => netSeats(),
@@ -45,6 +46,7 @@ app.show = new Presenter({
   data: null,
   speed: () => app.settings.speed,
   pace: () => app.settings.pace,
+  results: () => app.settings.results,
   onIdle() {
     // keep the "what changed" highlights a few seconds after the narrator is done
     const v = app.show.h.view();
@@ -133,12 +135,12 @@ function render() {
     html = { menu: V.menu, setup: V.setup, online: V.online, statsMenu: V.statsMenu, waiting: V.clientLobby }[app.screen](app);
   }
   const modal = typeof app.modal === "function" ? app.modal() : app.modal;
-  // every screen sits on the scaled 1920×1080 stage (ui/stage.js); modals live inside it so they scale too
-  // entry animations only when something new appears (screen, step, choice, modal), not on every re-render
-  const animKey = `${app.screen}|${app.setupStep}|${app.draft.key}|${!!modal}|${app.cover}|${app.statsTab}`;
-  const enter = animKey !== app.animKey;
-  app.animKey = animKey;
-  root.innerHTML = `<div class="stage screen-${app.screen} ${enter ? "enter" : ""}">${html}${modal ? V.rulesModal(app, modal) : ""}</div>`;
+  // Every screen sits on the scaled 1920×1080 stage (ui/stage.js); modals live inside it so they scale too.
+  // The page is *diffed* into the DOM (ui/morph.js), not replaced: a click on the sound button or a modal
+  // opening must not restart the animations of everything else. Only a new page (screen, wizard step, stats
+  // tab) is a new stage element, which is what plays the entry animations.
+  const pageKey = `${app.screen}|${app.setupStep}|${app.statsTab}`;
+  morph(root, `<div class="stage enter screen-${app.screen}" data-k="${pageKey}">${html}${modal ? V.rulesModal(app, modal) : ""}</div>`);
   const log = root.querySelector(".log");
   if (log) log.scrollTop = log.scrollHeight;
 }
@@ -505,7 +507,7 @@ root.addEventListener("click", (e) => {
   const stop = e.target.closest("[data-stop]");
   if (stop && !(t && stop.contains(t))) return; // clicks inside a modal only count on its own buttons
   const cardEl = e.target.closest("[data-card]");
-  if (cardEl && app.screen === "game" && !stop) return clickCard(cardEl.dataset.card, cardEl);
+  if (cardEl && app.screen === "game" && !stop && !cardEl.closest(".results")) return clickCard(cardEl.dataset.card, cardEl);
   if (!t || t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA") return;
   if (t.tagName === "BUTTON" && !["lock", "sound"].includes(t.dataset.act)) sound("click", { vol: 0.7 });
   const d = app.draft, v = app.screen === "game" ? currentView() : null;
@@ -534,6 +536,8 @@ root.addEventListener("click", (e) => {
     case "setting": app.settings[t.dataset.k] = t.dataset.v; saveSettings(); if (t.dataset.k === "speed" && t.dataset.v === "instant") app.show.skip(); break;
     case "skipShow": app.show.skip(); return;
     case "closeModal": app.modal = null; break;
+    case "closeResults": app.show.closeResults(); return;
+    case "showResults": app.show.openResults(+t.dataset.r); app.show.armResults(); break;
     case "toggleLog": app.showLog = !app.showLog; break;
     case "leave": leave(); return;
     case "unlock": app.unlocked = +t.dataset.pid; updateFocus(); break;
@@ -694,6 +698,7 @@ root.addEventListener("change", (e) => {
 document.addEventListener("keydown", (e) => {
   if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
   if (e.key === "Escape" && app.modal) { app.modal = null; render(); return; }
+  if ((e.key === "Escape" || e.key === "Enter") && app.show.res) { app.show.closeResults(); return; }
   if (app.screen !== "replay") return;
   if (e.key === "ArrowRight") replayGo(e.shiftKey ? "nextRound" : "next");
   else if (e.key === "ArrowLeft") replayGo(e.shiftKey ? "prevRound" : "prev");
