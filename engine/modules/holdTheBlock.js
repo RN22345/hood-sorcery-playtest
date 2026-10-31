@@ -46,7 +46,7 @@ export default {
         if (st.fx === "noHeal") { st.log.push({ r: st.round, k: "block", text: "Mugged: the Vein doesn't feed the holder this round." }); return; }
         const before = h.tracks.damage;
         h.tracks.damage = Math.max(0, before - ctx.p.blockHeal);
-        st.log.push({ r: st.round, k: "heal", pid: h.id, text: `The Vein feeds ${h.name}: −${before - h.tracks.damage} damage.` });
+        st.log.push({ r: st.round, k: "heal", pid: h.id, d: h.tracks.damage - before, text: `The Vein feeds ${h.name}: −${before - h.tracks.damage} damage.` });
       },
     },
     {
@@ -55,7 +55,7 @@ export default {
       run(st) {
         const first = rankStat(st, st.players.map((p) => p.id), "atk", "the Block")[0];
         st.zones[0].holder = first;
-        st.log.push({ r: st.round, k: "block", text: `${st.players[first].name} has the highest ATK and takes the empty Block.` });
+        st.log.push({ r: st.round, k: "block", zone: st.zones[0].name, holder: first, text: `${st.players[first].name} has the highest ATK and takes the empty Block.` });
         st.ext.justClaimed = st.round;
       },
     },
@@ -85,7 +85,7 @@ export default {
         if (!leaving) { st.log.push({ r: st.round, k: "block", text: `Thumbs: ${shown}. ${st.players[h].name} stays on the Block.` }); return; }
         const next = wants.length ? rankStat(st, wants, "atk", "moving in")[0] : null;
         st.zones[0].holder = next;
-        st.log.push({ r: st.round, k: "block", text: `Thumbs: ${shown}. ${st.players[h].name} ${answers[h] === "bail" ? "bails" : "is knocked off"}; ${next == null ? "the Block is empty" : st.players[next].name + " moves in"}.` });
+        st.log.push({ r: st.round, k: "block", zone: st.zones[0].name, holder: next ?? null, text: `Thumbs: ${shown}. ${st.players[h].name} ${answers[h] === "bail" ? "bails" : "is knocked off"}; ${next == null ? "the Block is empty" : st.players[next].name + " moves in"}.` });
       },
       bot(st, ctx, pid) {
         const h = holderOf(st);

@@ -56,14 +56,14 @@ export default {
           out.push({ z, before, winner, score, runnerUp });
           const who = (id) => (id == null ? "nobody" : st.players[id].name);
           const verb = winner == null ? "stays empty" : winner === before ? `held by ${who(winner)}` : `taken by ${who(winner)}`;
-          st.log.push({ r: st.round, k: "corner", text: `${z.name}: ${verb} (${here.map((h) => `${who(h.pid)} ${h.pid === before ? "BLK " + h.ln.blk : "ATK " + h.ln.atk}`).join(", ")})` });
+          st.log.push({ r: st.round, k: "corner", zone: z.name, holder: winner, pids: here.map((h) => h.pid), text: `${z.name}: ${verb} (${here.map((h) => `${who(h.pid)} ${h.pid === before ? "BLK " + h.ln.blk : "ATK " + h.ln.atk}`).join(", ")})` });
         }
         if (st.fx === "muggedCorner") {
           const c = out.filter((o) => o.runnerUp != null && o.winner != null).sort((a, b) => b.score - a.score)[0];
           if (c) {
             lost.add(c.winner); lost.delete(c.runnerUp);
             c.z.holder = c.runnerUp;
-            st.log.push({ r: st.round, k: "corner", text: `Mugged: ${c.z.name} goes to the runner-up, ${st.players[c.runnerUp].name}.` });
+            st.log.push({ r: st.round, k: "corner", zone: c.z.name, holder: c.runnerUp, text: `Mugged: ${c.z.name} goes to the runner-up, ${st.players[c.runnerUp].name}.` });
           }
         }
         for (const pl of st.players) {
@@ -73,8 +73,9 @@ export default {
           const upkeep = ctx.p.repUpkeepFrom ? Math.max(0, heldZones.length - ctx.p.repUpkeepFrom + 1) : 0;
           gain -= upkeep;
           if (st.fx === "bleedingRep" && lost.has(pl.id) && !st.zones.some((z) => z.holder === pl.id && st.res[pl.id].lines.some((l) => l.zone === z.i))) gain -= 1;
+          const repBefore = pl.tracks.rep;
           pl.tracks.rep = Math.max(0, pl.tracks.rep + gain);
-          if (gain) st.log.push({ r: st.round, k: "rep", pid: pl.id, text: `${pl.name} ${gain > 0 ? "+" : ""}${gain} Rep${st.res[pl.id].six ? " (incl. Thumb 6)" : ""}${upkeep ? ` (upkeep −${upkeep})` : ""} → ${pl.tracks.rep}` });
+          if (gain) st.log.push({ r: st.round, k: "rep", pid: pl.id, d: pl.tracks.rep - repBefore, text: `${pl.name} ${gain > 0 ? "+" : ""}${gain} Rep${st.res[pl.id].six ? " (incl. Thumb 6)" : ""}${upkeep ? ` (upkeep −${upkeep})` : ""} → ${pl.tracks.rep}` });
         }
       },
     },

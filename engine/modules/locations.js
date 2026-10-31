@@ -42,7 +42,8 @@ export default {
   challengerTies: (st, ctx, z) => z.loc === "oldChurch",
   contestLost(st, ctx, z, losers) {
     if (z.loc !== "precinct" || !losers.length) return;
-    for (const id of losers) st.players[id].tracks.rep = Math.max(0, st.players[id].tracks.rep - 1);
-    st.log.push({ r: st.round, k: "rep", text: `Precinct: ${losers.map((id) => st.players[id].name).join(", ")} −1 Rep.` });
+    const ds = {};
+    for (const id of losers) { const b = st.players[id].tracks.rep; st.players[id].tracks.rep = Math.max(0, b - 1); ds[id] = st.players[id].tracks.rep - b; }
+    st.log.push({ r: st.round, k: "rep", ds, zone: z.name, text: `Precinct: ${losers.map((id) => st.players[id].name).join(", ")} −1 Rep.` });
   },
 };

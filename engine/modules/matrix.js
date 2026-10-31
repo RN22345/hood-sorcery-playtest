@@ -29,7 +29,7 @@ export default {
           st.rd[pid] += d;
         }
         const ord = (o) => o.map((id) => st.players[id].name).join(" > ");
-        st.log.push({ r: st.round, k: "rank", text: `ATK: ${ord(atkOrder)} · BLK: ${ord(blkOrder)}` });
+        st.log.push({ r: st.round, k: "rank", ranks: { atk: atkOrder, blk: blkOrder }, text: `ATK: ${ord(atkOrder)} · BLK: ${ord(blkOrder)}` });
       },
     },
   ],

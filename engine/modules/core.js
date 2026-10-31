@@ -41,7 +41,7 @@ export default {
         st.wheel = sector.id;
         st.fx = ctx.cfg.wheel[sector.id] || sector.effect;
         applyLimits(st, ctx);
-        st.log.push({ r: st.round, k: "wheel", text: `The Wheel lands on ${sector.name}.` });
+        st.log.push({ r: st.round, k: "wheel", id: sector.id, text: `The Wheel lands on ${sector.name}.` });
       },
     },
     {
@@ -151,7 +151,7 @@ export default {
           if (six) d = Math.max(0, d - six);
           st.rd[pl.id] = d;
           pl.tracks.damage += d;
-          if (d || six) st.log.push({ r: st.round, k: "dmg", pid: pl.id, text: `${pl.name} takes ${d} damage${six ? " (Thumb 6: −" + six + ")" : ""}.` });
+          if (d || six) st.log.push({ r: st.round, k: "dmg", pid: pl.id, d, text: `${pl.name} takes ${d} damage${six ? " (Thumb 6: −" + six + ")" : ""}.` });
         }
       },
     },
@@ -194,7 +194,7 @@ export default {
         st.result = standings(st, ctx);
         st.over = true;
         const w = st.players[st.result.order[0]];
-        st.log.push({ r: st.round, k: "end", text: `The Vein closes. ${w.name} (${w.crew}) takes it.` });
+        st.log.push({ r: st.round, k: "end", pid: w.id, text: `The Vein closes. ${w.name} (${w.crew}) takes it.` });
       },
     },
   ],

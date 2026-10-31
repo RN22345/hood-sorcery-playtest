@@ -1,21 +1,21 @@
-// Controller: loads data, runs the lobby, and drives a game as one of three roles:
+// Controller: loads data, runs the menus, and drives a game as one of three roles:
 //   local  - everything on this device (hot-seat humans + bots)
 //   host   - like local, plus online seats; this browser owns the state and sends each client
 //            only viewFor(state, theirSeat)
 //   client - joined someone's room; renders the views it receives, sends its answers
-// No rules here: the engine decides everything.
+// No rules here: the engine decides everything. The narrator (show.js) paces how results are *shown*.
 import { prepareData, createGame, act, viewFor, botChoice, makeCtx, setSeatKind } from "../engine/game.js";
 import { modifierProblems } from "../engine/registry.js";
 import { castProblem, allowedZones } from "../engine/cast.js";
 import { Host, Client } from "../net/peer.js";
 import * as V from "./views.js";
-import { roundSummary } from "../engine/summary.js";
 import { md } from "./md.js";
 import { Timer, computeStats, statsMarkdown, statsCsv, parseStatsFile, compareStats, compareMarkdown, compareCsv } from "./stats.js";
 import { buildReplay } from "./replay.js";
 import { statsPanel, statsImage } from "./statsView.js";
 import "./stage.js";
-import { banner, wheelReel, sound, toggleMute, isMuted, clearFx } from "./fx.js";
+import { sound, toggleMute, clearFx, music, setAudio } from "./fx.js";
+import { Presenter } from "./show.js";
 
 const root = document.getElementById("app");
 const getJson = (p) => fetch(p).then((r) => { if (!r.ok) throw new Error(`${p}: ${r.status}`); return r.json(); });
@@ -24,26 +24,46 @@ const store = {
   set(k, v) { try { localStorage.setItem("hsp:" + k, JSON.stringify(v)); } catch {} },
 };
 const newSeed = () => Math.random().toString(36).slice(2, 8);
+const BOT_MS = { slow: 1100, normal: 650, fast: 250 };
 
 const app = {
-  screen: "lobby", role: null, st: null, view: null, seat: null, setup: null,
+  screen: "menu", setupStep: 0, role: null, st: null, view: null, seat: null, setup: null,
   localSeats: [], localCount: 0, focus: null, cover: null, unlocked: null,
   draft: { key: "", zone: 0, lines: {}, thumbs: [], pick: [] }, allowedZones: [], castProblem: null,
   net: { code: null, status: "", seatNames: {}, conn2seat: {} },
-  showLog: !window.matchMedia?.("(max-width: 900px)").matches, error: "", lobbyError: "", survey: { best: "", obvious: "", reads: "", fun: "" }, modal: null,
-  botDelay: 650, // bots "think" a moment, so a table of bots reads like players, not a script
-  muted: isMuted(), fxSeen: { round: 0, over: false, turn: "" },
-  reveal: { seen: 0, until: 0, fresh: false }, // the few seconds after a round's cards flip
+  showLog: false, error: "", lobbyError: "", survey: { best: "", obvious: "", reads: "", fun: "" }, modal: null,
+  settings: Object.assign({ speed: "normal", pace: "each", botSpeed: "normal" }, store.get("settings", {})),
+  revealing: 0, drag: null, handOrder: [],
   modProblem(mode, m) { return modifierProblems(mode, m)[0] || ""; },
   netSeats: () => netSeats(),
 };
 window.hsApp = app; // handy in the console while playtesting
+
+app.show = new Presenter({
+  view: () => (app.screen === "game" || app.screen === "replay" ? currentView() : null),
+  render: () => render(),
+  data: null,
+  speed: () => app.settings.speed,
+  pace: () => app.settings.pace,
+  onIdle() {
+    // keep the "what changed" highlights a few seconds after the narrator is done
+    const v = app.show.h.view();
+    if (v) {
+      app.revealing = v.revealed ? v.round : v.round - 1;
+      clearTimeout(app.revealTimer);
+      app.revealTimer = setTimeout(() => { app.revealing = 0; if (app.screen === "game" || app.screen === "replay") render(); }, 5000);
+      if (v.choice) sound("turn");
+    }
+    scheduleBots();
+  },
+});
 
 async function boot() {
   try {
     const [cards, wheel, matrices, crews, modeIds, modifiers] = await Promise.all(
       ["data/cards.json", "data/wheel.json", "data/matrices.json", "data/crews.json", "data/modes/index.json", "data/modifiers.json"].map(getJson));
     app.data = prepareData({ cards, wheel, matrices, crews });
+    app.show.h.data = app.data;
     app.modes = Object.fromEntries((await Promise.all(modeIds.map((id) => getJson(`data/modes/${id}.json`)))).map((m) => [m.id, m]));
     app.modifiers = Object.fromEntries(modifiers.map((m) => [m.id, m]));
   } catch (e) {
@@ -55,9 +75,10 @@ async function boot() {
     modeId: app.modes[saved.modeId] ? saved.modeId : "corners",
     mods: saved.mods || [],
     seats: saved.seats || [{ kind: "human", name: "" }, { kind: "bot", name: "" }, { kind: "bot", name: "" }, { kind: "bot", name: "" }],
-    seed: newSeed(), joinName: saved.joinName || "",
+    seed: newSeed(), seedRandom: saved.seedRandom ?? true, joinName: saved.joinName || "",
     joinCode: new URLSearchParams(location.search).get("join") || "",
   };
+  if (app.lob.joinCode) app.screen = "online";
   render();
 }
 
@@ -65,7 +86,7 @@ async function boot() {
 function currentView() {
   if (app.screen === "replay") return replayView();
   if (app.role === "client") { app.cover = null; app.localCount = 1; return app.view; }
-  return viewFor(app.st, app.data, app.focus);
+  return app.st ? viewFor(app.st, app.data, app.focus) : null;
 }
 
 function prepareDraft(v) {
@@ -80,19 +101,6 @@ function prepareDraft(v) {
   if (c?.type === "cast") app.castProblem = castProblem(v, makeCtx(v, app.data), v.you, draftCast(), c.limits);
 }
 
-// A round's lines become visible either mid-round (v.revealed, e.g. before Flip the Script) or, when
-// nothing is left to decide, only as last round's lines (v.lastRes). Either way: flip once, highlight a while.
-const REVEAL_MS = 6000;
-function trackReveal(v) {
-  const r = v.revealed ? v.round : v.lastRes ? v.round - 1 : 0;
-  if (r > app.reveal.seen) {
-    app.reveal = { seen: r, until: Date.now() + REVEAL_MS, fresh: true };
-    clearTimeout(app.revealTimer);
-    app.revealTimer = setTimeout(() => (app.screen === "game" || app.screen === "replay") && render(), REVEAL_MS + 50);
-  }
-  app.revealing = Date.now() < app.reveal.until ? r : 0;
-}
-
 function draftCast() {
   return { lines: Object.entries(app.draft.lines).map(([z, cards]) => ({ zone: +z, cards })), thumbs: [...app.draft.thumbs] };
 }
@@ -100,6 +108,7 @@ function draftCast() {
 function render() {
   let html;
   if (app.screen !== app.lastScreen) { clearFx(); app.lastScreen = app.screen; }
+  music(app.screen === "game" || app.screen === "replay" ? "game" : "menu");
   if (app.screen === "stats") {
     const tab = app.statsTab ?? "0";
     const body = tab === "compare"
@@ -108,56 +117,30 @@ function render() {
     html = V.statsScreen(app, body);
   } else if (app.screen === "replay") {
     const v = replayView();
-    if (app.reveal.seen > (v.revealed ? v.round : v.round - 1)) app.reveal.seen = 0; // stepping back: flip again later
-    trackReveal(v);
-    gameFx(v);
+    app.show.feed(v);
     html = V.game(app, v, { panel: V.replayPanel(app, v, app.rp), side: V.replayHands(app, v) });
-    app.reveal.fresh = false;
-  } else if (app.screen === "lobby") {
-    app.recentStats = store.get("recentStats", []);
-    html = app.role === "client" ? V.clientLobby(app) : V.lobby(app);
-    if (app.role === "host") broadcastLobby();
-  } else {
+  } else if (app.screen === "game") {
     const v = currentView();
     if (!v) { root.innerHTML = "<p class='muted'>Waiting for the host…</p>"; return; }
     prepareDraft(v);
-    trackReveal(v);
-    gameFx(v);
+    app.show.feed(v);
     (app.timer ||= new Timer(Date.now())).observe(v, Date.now());
     if (v.over && !app.statsSaved) { app.statsSaved = true; rememberStats(computeStats(gameRecord())); }
     html = V.game(app, v);
-    app.reveal.fresh = false; // the flip animates once; later renders keep only the highlights
+  } else {
+    app.recentStats = store.get("recentStats", []);
+    if (app.role === "host") broadcastLobby();
+    html = { menu: V.menu, setup: V.setup, online: V.online, statsMenu: V.statsMenu, waiting: V.clientLobby }[app.screen](app);
   }
+  const modal = typeof app.modal === "function" ? app.modal() : app.modal;
   // every screen sits on the scaled 1920×1080 stage (ui/stage.js); modals live inside it so they scale too
-  root.innerHTML = `<div class="stage screen-${app.screen}">${html}${app.modal ? V.rulesModal(app, app.modal) : ""}</div>`;
+  // entry animations only when something new appears (screen, step, choice, modal), not on every re-render
+  const animKey = `${app.screen}|${app.setupStep}|${app.draft.key}|${!!modal}|${app.cover}|${app.statsTab}`;
+  const enter = animKey !== app.animKey;
+  app.animKey = animKey;
+  root.innerHTML = `<div class="stage screen-${app.screen} ${enter ? "enter" : ""}">${html}${modal ? V.rulesModal(app, modal) : ""}</div>`;
   const log = root.querySelector(".log");
   if (log) log.scrollTop = log.scrollHeight;
-}
-
-// Banners, the Wheel reel and sounds when something happens (new round, flip, your turn, game over).
-function gameFx(v) {
-  const seen = app.fxSeen;
-  if (v.round && v.round !== seen.round && !v.over) {
-    seen.round = v.round;
-    const sector = app.data.wheel.find((w) => w.id === v.wheel);
-    banner(`Round ${v.round}`, `of ${v.mode.params.rounds}`, { ms: 1100, cls: "small" });
-    if (sector) setTimeout(() => wheelReel(app.data.wheel, sector), 500);
-  }
-  if (app.reveal.fresh) {
-    sound("flip");
-    const s = roundSummary(v);
-    const mine = s?.round === app.revealing && v.you != null ? s.items.filter((i) => i.pid === v.you) : [];
-    if (mine.length) setTimeout(() => sound(mine.some((i) => i.kind === "damage" && i.delta > 0) || mine.some((i) => i.kind === "lose") ? "hit" : "coin"), 650);
-  }
-  const turn = v.choice ? `${v.round}|${v.stepIdx}|${v.choice.step}|${v.you}` : "";
-  if (turn && turn !== seen.turn) sound("turn");
-  seen.turn = turn;
-  if (v.over && !seen.over) {
-    seen.over = true;
-    const w = v.players[v.result.order[0]];
-    banner(`${w.name} takes it`, "The Vein closes", { color: w.color, ms: 2600, cls: "final" });
-    sound("win");
-  }
 }
 
 // ------------------------------------------------------------------ game flow (local / host)
@@ -165,24 +148,27 @@ function startGame() {
   const { lob, data } = app;
   const mode = app.modes[lob.modeId];
   const mods = lob.mods.map((id) => app.modifiers[id]).filter((m) => m && !app.modProblem(mode, m));
+  const seed = lob.seedRandom ? newSeed() : lob.seed;
   const seats = lob.seats.map((s, i) => ({
     kind: s.kind === "bot" ? "bot" : "human",
     name: s.kind === "online" ? app.net.seatNames[i] : s.name.trim() || data.crews[i].name,
   }));
   try {
-    app.st = createGame({ mode, modifiers: mods, seats, seed: lob.seed }, data);
+    app.st = createGame({ mode, modifiers: mods, seats, seed }, data);
   } catch (e) { app.lobbyError = e.message; render(); return; }
-  app.setup = { modeId: mode.id, modifiers: mods.map((m) => m.id), seats, seed: lob.seed };
+  app.setup = { modeId: mode.id, modifiers: mods.map((m) => m.id), seats, seed };
   app.localSeats = lob.seats.map((s, i) => (s.kind === "human" ? i : -1)).filter((i) => i >= 0);
   app.role = lob.seats.some((s) => s.kind === "online") ? "host" : "local";
   app.onlineSeats = lob.seats.map((s, i) => (s.kind === "online" ? i : -1)).filter((i) => i >= 0);
   app.screen = "game";
-  app.unlocked = null;
+  app.unlocked = null; app.modal = null; app.handOrder = [];
   app.survey = { best: "", obvious: "", reads: "", fun: "" };
   app.lobbyError = "";
-  app.reveal = { seen: 0, until: 0, fresh: false };
   app.timer = new Timer(Date.now()); app.statsSaved = false;
-  app.fxSeen = { round: 0, over: false, turn: "" };
+  updateFocus();
+  const v0 = currentView() || viewFor(app.st, data, null);
+  app.show.startAt(v0, v0.log.findIndex((e) => e.k === "round")); // play "Round 1" and the first Wheel spin
+  sound("shuffle");
   changed();
 }
 
@@ -204,42 +190,45 @@ function changed() {
   scheduleBots();
 }
 
+// Bots answer after a short "think", and never while the narrator is still showing the last result.
 function scheduleBots() {
   clearTimeout(app.botTimer);
   const st = app.st;
-  if (!st || st.over || !st.pending) return;
+  if (!st || st.over || !st.pending || app.screen !== "game" || app.show.busy) return;
   const bot = st.pending.who.find((id) => st.players[id].kind === "bot" && !(id in st.pending.answers));
   if (bot == null) return;
   app.botTimer = setTimeout(() => {
-    if (app.st !== st) return;
+    if (app.st !== st || app.show.busy) return;
     const r = act(st, app.data, { pid: bot, value: botChoice(st, app.data, bot) });
     if (r.error) { console.error("bot", bot, r.error); return; }
     app.st = r.state;
     changed();
-  }, app.botDelay);
+  }, BOT_MS[app.settings.botSpeed] ?? 650);
 }
 
 function submit(value) {
   app.error = "";
   if (app.role === "client") { app.net.client.act(value); return; }
   const r = act(app.st, app.data, { pid: app.focus, value });
-  if (r.error) { app.error = r.error; render(); return; }
+  if (r.error) { app.error = r.error; sound("error"); render(); return; }
   app.st = r.state;
   if (app.localCount > 1) app.unlocked = null;
   changed();
 }
 
+function toMenu() {
+  clearTimeout(app.botTimer); clearTimeout(app.revealTimer);
+  app.show.reset();
+  app.timer = null; app.statsSaved = false; app.modal = null;
+  app.net.host?.close(); app.net.client?.close();
+  Object.assign(app, { screen: "menu", role: null, st: null, view: null, seat: null, remoteLobby: null, remoteNet: null, onlineSeats: [], error: "", lobbyError: "" });
+  app.net = { code: null, status: "", seatNames: {}, conn2seat: {} };
+  render();
+}
+
 function leave() {
   if (app.screen === "game" && app.st && !app.st.over && app.role !== "client" && !confirm("Leave this game?")) return;
-  clearTimeout(app.botTimer); clearTimeout(app.revealTimer);
-  app.reveal = { seen: 0, until: 0, fresh: false };
-  app.timer = null; app.statsSaved = false;
-  app.fxSeen = { round: 0, over: false, turn: "" };
-  app.net.host?.close(); app.net.client?.close();
-  Object.assign(app, { screen: "lobby", role: null, st: null, view: null, seat: null, remoteLobby: null, remoteNet: null, onlineSeats: [], error: "" });
-  app.net = { code: null, status: "", seatNames: {}, conn2seat: {} };
-  app.lob.seed = newSeed();
-  render();
+  toMenu();
 }
 
 // ------------------------------------------------------------------ online
@@ -250,14 +239,14 @@ async function openHost() {
       const { lob, net } = app;
       const connected = Object.values(net.conn2seat);
       let seat = Object.keys(net.seatNames).map(Number).find((i) => net.seatNames[i] === name && !connected.includes(i));
-      if (seat == null && app.screen === "lobby") {
+      if (seat == null && app.screen !== "game") {
         seat = lob.seats.findIndex((s, i) => s.kind === "online" && !net.seatNames[i]);
         if (seat < 0) seat = null;
         else net.seatNames[seat] = name;
       }
       net.conn2seat[connId] = seat ?? null;
       queueMicrotask(() => {
-        if (app.screen !== "game") { render(); return; }
+        if (app.screen !== "game") { sound("confirm"); render(); return; }
         // a dropped player who comes back takes their seat back from the bot
         if (seat != null && app.onlineSeats.includes(seat) && app.st.players[seat].kind === "bot") app.st = setSeatKind(app.st, seat, "human");
         app.net.status = seat != null ? `${name} is connected.` : app.net.status;
@@ -276,7 +265,7 @@ async function openHost() {
     onLeave(connId) {
       const seat = app.net.conn2seat[connId];
       delete app.net.conn2seat[connId];
-      if (app.screen === "lobby" && seat != null) delete app.net.seatNames[seat];
+      if (app.screen !== "game" && seat != null) delete app.net.seatNames[seat];
       app.net.status = seat != null ? `${app.net.seatNames[seat] || app.data.crews[seat].seat} disconnected${app.screen === "game" ? ": they can rejoin with the same name, or a bot can take over" : ""}` : app.net.status;
       if (app.screen === "game") broadcastViews();
       render();
@@ -314,16 +303,25 @@ function reconnect() {
 
 async function joinRoom() {
   const { joinName, joinCode } = app.lob;
-  if (!joinName.trim() || !joinCode.trim()) { app.lobbyError = "Enter your name and the room code."; render(); return; }
+  if (!joinName.trim() || !joinCode.trim()) { app.lobbyError = "Enter your name and the room code."; sound("error"); render(); return; }
   store.set("lobby", { ...store.get("lobby", {}), joinName });
   app.role = "client";
   app.net.code = joinCode.trim().toUpperCase();
+  if (app.screen !== "game") app.screen = "waiting";
   const client = new Client({
     onMessage(m) {
-      if (m.t === "welcome") { app.seat = m.seat; app.net.lost = false; app.net.status = `Connected to room ${app.net.code}.`; }
+      if (m.t === "welcome") { app.seat = m.seat; app.net.lost = false; app.net.status = `Connected to room ${app.net.code}.`; sound("confirm"); }
       else if (m.t === "lobby") app.remoteLobby = m.lobby;
-      else if (m.t === "view") { app.view = m.view; app.remoteNet = m.net || []; app.screen = "game"; app.error = ""; }
-      else if (m.t === "error") app.error = m.text;
+      else if (m.t === "view") {
+        const first = !app.view;
+        app.view = m.view; app.remoteNet = m.net || []; app.error = "";
+        if (first) {
+          app.screen = "game";
+          let k = -1; m.view.log.forEach((e, i) => { if (e.k === "round") k = i; });
+          app.show.startAt(m.view, Math.max(0, k)); // show this round's opening
+          app.timer = new Timer(Date.now());
+        }
+      } else if (m.t === "error") { app.error = m.text; sound("error"); }
       render();
     },
     onStatus(s) { app.net.status = s; render(); },
@@ -335,12 +333,12 @@ async function joinRoom() {
 }
 
 // ------------------------------------------------------------------ misc actions
-async function openRules() {
-  const modeId = app.screen === "game" ? (app.role === "client" ? app.view.mode.id : app.st.mode.id) : app.lob.modeId;
+async function openRules(modeId) {
+  modeId ||= app.screen === "game" || app.screen === "replay" ? currentView()?.mode.id : app.lob.modeId;
   let text = "";
   try { text = await fetch(`modes/${modeId}.md`).then((r) => r.text()); } catch { text = "Rules page missing."; }
   const mods = Object.values(app.modifiers).map((m) => `- **${m.name}**: ${m.desc}`).join("\n");
-  app.modal = md(text) + md(`## Modifiers\n\n${mods}\n\nThe printed rules are SRD v3.10.20; every mode here is a playtest variant.`);
+  app.modal = md(text) + md(`## House rules (modifiers)\n\n${mods}\n\nThe printed rules are SRD v3.10.20; every mode here is a playtest variant.`);
   render();
 }
 
@@ -423,9 +421,9 @@ function openReplay(log, back) {
   } catch (e) { alert(e.message); return; }
   app.modal = null;
   app.cover = null; app.localCount = 0;
-  app.reveal = { seen: 0, until: 0, fresh: false };
-  app.fxPrev = app.fxSeen; app.fxSeen = { round: 0, over: true, turn: "" }; // no win fanfare inside a replay
   app.screen = "replay";
+  const v = replayView();
+  app.show.startAt(v, v.log.findIndex((e) => e.k === "round"));
   render();
   scrollTo(0, 0);
 }
@@ -448,7 +446,10 @@ function replayGo(to) {
     prevRound: rp.rounds[round] < rp.at ? rp.rounds[round] : rp.rounds[round - 1] ?? 0,
     nextRound: rp.rounds[round + 1] ?? last,
   }[to] ?? +to;
-  rp.at = Math.max(0, Math.min(last, at));
+  const target = Math.max(0, Math.min(last, at));
+  if (to !== "next") app.show.reset(); // jumps don't replay the narration; single steps forward do
+  rp.at = target;
+  if (to !== "next") app.show.reset(replayView());
   if (rp.at === last) replayPlay(false);
   render();
 }
@@ -457,16 +458,15 @@ function replayPlay(on = !app.rp?.playing) {
   clearInterval(app.replayTimer);
   if (!app.rp) return;
   app.rp.playing = on;
-  if (on) app.replayTimer = setInterval(() => replayGo("next"), 900);
+  if (on) app.replayTimer = setInterval(() => { if (!app.show.busy) replayGo("next"); }, 400);
 }
 
 function closeReplay() {
   replayPlay(false);
-  const back = app.rp?.back || "lobby";
+  const back = app.rp?.back || "menu";
   app.rp = null;
-  app.fxSeen = app.fxPrev || { round: 0, over: false, turn: "" };
   app.screen = back;
-  if (back === "game") updateFocus();
+  if (back === "game") { updateFocus(); app.show.reset(currentView()); }
   render();
 }
 
@@ -488,7 +488,8 @@ async function statsDownload(act, el) {
   }
 }
 
-function saveLobby() { store.set("lobby", { modeId: app.lob.modeId, mods: app.lob.mods, seats: app.lob.seats.map((s) => ({ kind: s.kind, name: s.name })), joinName: app.lob.joinName }); }
+function saveLobby() { store.set("lobby", { modeId: app.lob.modeId, mods: app.lob.mods, seats: app.lob.seats.map((s) => ({ kind: s.kind, name: s.name })), joinName: app.lob.joinName, seedRandom: app.lob.seedRandom }); }
+function saveSettings() { store.set("settings", app.settings); }
 
 function fitSeats() {
   const allowed = app.modes[app.lob.modeId].players;
@@ -499,31 +500,49 @@ function fitSeats() {
 
 // ------------------------------------------------------------------ events
 root.addEventListener("click", (e) => {
+  if (app.justDragged) { app.justDragged = false; return; }
   const t = e.target.closest("[data-act]");
   const stop = e.target.closest("[data-stop]");
   if (stop && !(t && stop.contains(t))) return; // clicks inside a modal only count on its own buttons
   const cardEl = e.target.closest("[data-card]");
   if (cardEl && app.screen === "game" && !stop) return clickCard(cardEl.dataset.card, cardEl);
   if (!t || t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA") return;
+  if (t.tagName === "BUTTON" && !["lock", "sound"].includes(t.dataset.act)) sound("click", { vol: 0.7 });
   const d = app.draft, v = app.screen === "game" ? currentView() : null;
   switch (t.dataset.act) {
-    case "seatAdd": app.lob.seats.push({ kind: "bot", name: "" }); break;
-    case "seatDel": app.lob.seats.pop(); break;
+    case "go":
+      if (t.dataset.to === "menu" && app.role) { toMenu(); return; }
+      app.screen = t.dataset.to; app.lobbyError = ""; app.setupStep = 0; sound("whoosh2"); break;
+    case "step": fitSeats(); app.setupStep = Math.max(0, Math.min(2, +t.dataset.to)); sound("whoosh2"); break;
+    case "hostSetup":
+      app.lob.seats.forEach((s, i) => { if (i > 0 && s.kind === "human") s.kind = "online"; });
+      if (!app.lob.seats.some((s) => s.kind === "online")) app.lob.seats[1].kind = "online";
+      app.screen = "setup"; app.setupStep = 1; saveLobby(); break;
+    case "seatAdd": app.lob.seats.push({ kind: "bot", name: "" }); saveLobby(); break;
+    case "seatDel": app.lob.seats.pop(); saveLobby(); break;
     case "host": openHost(); return;
     case "start": saveLobby(); startGame(); return;
+    case "rematch": startGame(); return;
     case "join": joinRoom(); return;
+    case "reseed": app.lob.seed = newSeed(); sound("dice"); break;
     case "copyLink": navigator.clipboard?.writeText(`${location.origin}${location.pathname}?join=${app.net.code}`); app.net.status = "Invite link copied."; break;
     case "rules": openRules(); return;
+    case "rulesFor": e.preventDefault(); openRules(t.dataset.id); return;
+    case "howto": app.modal = V.howToHtml; break;
+    case "credits": app.modal = V.creditsHtml(); break;
+    case "settings": app.modal = () => V.settingsModal(app); break;
+    case "setting": app.settings[t.dataset.k] = t.dataset.v; saveSettings(); if (t.dataset.k === "speed" && t.dataset.v === "instant") app.show.skip(); break;
+    case "skipShow": app.show.skip(); return;
     case "closeModal": app.modal = null; break;
     case "toggleLog": app.showLog = !app.showLog; break;
     case "leave": leave(); return;
     case "unlock": app.unlocked = +t.dataset.pid; updateFocus(); break;
-    case "opt": submit(v.choice.options[+t.dataset.i].value); return;
-    case "pickDone": submit([...d.pick]); return;
+    case "opt": sound("lock"); submit(v.choice.options[+t.dataset.i].value); return;
+    case "pickDone": sound("fan"); submit([...d.pick]); return;
     case "zone": d.zone = +t.dataset.zone; break;
-    case "thumbAdd": d.thumbs.push(d.zone); break;
+    case "thumbAdd": d.thumbs.push(d.zone); sound("dice"); break;
     case "thumbDel": d.thumbs.pop(); break;
-    case "clear": d.lines = {}; d.thumbs = []; break;
+    case "clear": d.lines = {}; d.thumbs = []; sound("fan"); break;
     case "lock": sound("lock"); submit(draftCast()); return;
     case "download": download(); return;
     case "reconnect": reconnect(); return;
@@ -535,10 +554,10 @@ root.addEventListener("click", (e) => {
     case "replayClose": closeReplay(); return;
     case "recentStats": showStats([app.recentStats[+t.dataset.i]]); return;
     case "recentAll": showStats(app.recentStats); return;
-    case "statsBack": app.screen = "lobby"; app.statsList = []; break;
+    case "statsBack": app.screen = "statsMenu"; app.statsList = []; break;
     case "statsTab": app.statsTab = t.dataset.i; break;
     case "seatKind": app.lob.seats[+t.dataset.i].kind = t.dataset.v; saveLobby(); break;
-    case "sound": app.muted = toggleMute(); break;
+    case "sound": toggleMute(); break;
     case "seatBot": case "seatHuman":
       if (app.role !== "host") return;
       app.st = setSeatKind(app.st, +t.dataset.i, t.dataset.act === "seatBot" ? "bot" : "human");
@@ -548,24 +567,113 @@ root.addEventListener("click", (e) => {
   render();
 });
 
+// ---------------------------------------------------------------- cards: click, or pick up and drag
+const castOpen = () => { const v = app.screen === "game" && !app.show.busy ? currentView() : null; return v?.choice?.type === "cast" ? v : null; };
+const removeFromLines = (id) => {
+  const d = app.draft;
+  for (const z of Object.keys(d.lines)) {
+    d.lines[z] = d.lines[z].filter((x) => x !== id);
+    if (!d.lines[z].length) { delete d.lines[z]; d.thumbs = d.thumbs.filter((t) => t !== +z); }
+  }
+};
+
 function clickCard(id, elx) {
   const v = currentView();
-  const c = v?.choice;
+  const c = app.show.busy ? null : v?.choice;
   const d = app.draft;
   if (!c) return;
   if (c.type === "pickCards" && elx.closest(".hand-cards")) {
     d.pick = d.pick.includes(id) ? d.pick.filter((x) => x !== id) : d.pick.length < c.count ? [...d.pick, id] : d.pick;
+    sound("pick");
   } else if (c.type === "cast") {
-    const slot = elx.closest(".slot");
-    if (slot) {
-      const z = +slot.dataset.zone;
-      d.lines[z] = d.lines[z].filter((x) => x !== id);
-      if (!d.lines[z].length) { delete d.lines[z]; d.thumbs = d.thumbs.filter((t) => t !== z); }
-    } else if (elx.closest(".hand-cards") && !Object.values(d.lines).flat().includes(id)) {
-      (d.lines[d.zone] ||= []).push(id);
-      sound("card");
-    }
+    if (elx.closest(".slot")) { removeFromLines(id); sound("pick"); }
+    else if (elx.closest(".hand-cards") && !Object.values(d.lines).flat().includes(id)) { (d.lines[d.zone] ||= []).push(id); sound("place"); }
+    else return;
   } else return;
+  render();
+}
+
+// Pointer-based drag (mouse and touch): a ghost card follows the pointer in a layer outside #app, so
+// re-renders while dragging (bots answering) don't drop it. Drop on a line slot or a zone on the table to
+// cast it there (at that position: order matters for seams), back on the hand to take it out, or move it
+// within the hand to rearrange your hand.
+let press = null, ghost = null;
+root.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0 || app.screen !== "game") return;
+  const el = e.target.closest(".hand-cards .card, .slot .card");
+  if (!el) return;
+  press = { id: el.dataset.card, fromSlot: !!el.closest(".slot"), x: e.clientX, y: e.clientY, rect: el.getBoundingClientRect(), img: el.querySelector("img")?.src };
+});
+addEventListener("pointermove", (e) => {
+  if (!press) return;
+  if (!app.drag) {
+    if (Math.hypot(e.clientX - press.x, e.clientY - press.y) < 7) return;
+    if (!castOpen() && press.fromSlot) { press = null; return; }
+    app.drag = { id: press.id };
+    ghost = document.createElement("div");
+    ghost.className = "drag-ghost";
+    ghost.innerHTML = `<img src="${press.img}" alt="">`;
+    Object.assign(ghost.style, { width: press.rect.width + "px", height: press.rect.height + "px" });
+    document.body.appendChild(ghost);
+    sound("pick");
+    render();
+  }
+  ghost.style.transform = `translate(${e.clientX - press.rect.width / 2}px, ${e.clientY - press.rect.height * 0.6}px) rotate(${Math.max(-12, Math.min(12, (e.clientX - press.x) / 30))}deg)`;
+  document.querySelectorAll(".drop-on").forEach((x) => x.classList.remove("drop-on"));
+  dropTarget(e)?.el.classList.add("drop-on");
+});
+addEventListener("pointerup", (e) => {
+  if (!press) return;
+  if (app.drag) {
+    const target = dropTarget(e);
+    finishDrag(target, e);
+    app.justDragged = true;
+    setTimeout(() => (app.justDragged = false), 0);
+  }
+  press = null;
+});
+
+function dropTarget(e) {
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  if (!under) return null;
+  const v = castOpen();
+  if (v) {
+    const slot = under.closest(".slot");
+    if (slot) return { el: slot, zone: +slot.dataset.zone };
+    const zoneEl = under.closest(".zone");
+    const z = zoneEl && v.zones.find((x) => x.name === zoneEl.dataset.zone);
+    if (z && app.allowedZones.includes(z.i)) return { el: zoneEl, zone: z.i };
+  }
+  const hand = under.closest(".hand");
+  if (hand) return { el: hand, hand: true };
+  return null;
+}
+
+function finishDrag(target, e) {
+  const id = app.drag.id;
+  ghost?.remove(); ghost = null;
+  app.drag = null;
+  document.querySelectorAll(".drop-on").forEach((x) => x.classList.remove("drop-on"));
+  const d = app.draft;
+  if (target?.zone != null) {
+    removeFromLines(id);
+    const line = (d.lines[target.zone] ||= []);
+    const cards = [...target.el.querySelectorAll(".slot-cards .card")].filter((c) => c.dataset.card !== id);
+    const at = target.el.classList.contains("slot") ? cards.filter((c) => { const r = c.getBoundingClientRect(); return r.left + r.width / 2 < e.clientX; }).length : line.length;
+    line.splice(Math.min(at, line.length), 0, id);
+    d.zone = target.zone;
+    sound("place");
+  } else if (target?.hand) {
+    const wasInLine = Object.values(d.lines).flat().includes(id);
+    removeFromLines(id);
+    // rearrange the hand: drop position among the other hand cards
+    const others = [...target.el.querySelectorAll(".hand-cards .card")].filter((c) => c.dataset.card !== id);
+    const order = others.map((c) => c.dataset.card);
+    const at = others.filter((c) => { const r = c.getBoundingClientRect(); return r.left + r.width / 2 < e.clientX; }).length;
+    order.splice(at, 0, id);
+    app.handOrder = order;
+    sound(wasInLine ? "pick" : "card");
+  }
   render();
 }
 
@@ -573,17 +681,20 @@ root.addEventListener("change", (e) => {
   const t = e.target, a = t.dataset.act, lob = app.lob;
   if (a === "statsFile") { loadStatsFiles([...t.files]); return; }
   if (a === "replaySeek") { replayGo(t.value); return; }
-  if (a === "mode") { lob.modeId = t.value; fitSeats(); }
-  else if (a === "mod") lob.mods = t.checked ? [...lob.mods, t.value] : lob.mods.filter((x) => x !== t.value);
-  else if (a === "seatKind") lob.seats[+t.dataset.i].kind = t.value;
+  if (a === "muteAll") { setAudio({ muted: t.checked }); render(); return; }
+  if (a === "mode") { lob.modeId = t.value; fitSeats(); sound("select"); }
+  else if (a === "mod") { lob.mods = t.checked ? [...lob.mods, t.value] : lob.mods.filter((x) => x !== t.value); sound("toggle"); }
+  else if (a === "seedRandom") { lob.seedRandom = t.checked; sound("toggle"); }
   else return;
   saveLobby();
   render();
 });
 
-// replay: arrow keys step, shift+arrow jumps a round, space plays/pauses
+// replay: arrow keys step, shift+arrow jumps a round, space plays/pauses; Escape closes a modal
 document.addEventListener("keydown", (e) => {
-  if (app.screen !== "replay" || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if (e.key === "Escape" && app.modal) { app.modal = null; render(); return; }
+  if (app.screen !== "replay") return;
   if (e.key === "ArrowRight") replayGo(e.shiftKey ? "nextRound" : "next");
   else if (e.key === "ArrowLeft") replayGo(e.shiftKey ? "prevRound" : "prev");
   else if (e.key === " ") { replayPlay(); render(); }
@@ -591,7 +702,7 @@ document.addEventListener("keydown", (e) => {
   e.preventDefault();
 });
 
-// drop stats reports / game logs anywhere on the lobby
+// drop stats reports / game logs anywhere outside a game
 root.addEventListener("dragover", (e) => { if (app.screen !== "game") e.preventDefault(); });
 root.addEventListener("drop", (e) => {
   if (app.screen === "game" || !e.dataTransfer?.files.length) return;
@@ -604,8 +715,9 @@ root.addEventListener("input", (e) => {
   if (a === "seatName") lob.seats[+t.dataset.i].name = t.value;
   else if (a === "seed") lob.seed = t.value;
   else if (a === "joinName") lob.joinName = t.value;
-  else if (a === "joinCode") lob.joinCode = t.value;
+  else if (a === "joinCode") lob.joinCode = t.value.toUpperCase();
   else if (a === "survey") app.survey[t.dataset.k] = t.value;
+  else if (a === "vol") { setAudio({ [t.dataset.k]: t.value / 100 }); if (t.dataset.k === "sfx") sound("chip"); }
 });
 
 boot();

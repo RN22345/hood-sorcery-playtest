@@ -53,7 +53,7 @@ export default {
           const w = here.length === 1 ? here[0] : rankStat(st, here, "atk", z.name)[0];
           const before = z.holder;
           z.holder = w;
-          st.log.push({ r: st.round, k: "spot", text: `${z.name}: ${st.players[w].name} ${before === w ? "keeps it" : "takes it"}${here.length > 1 ? " (" + here.map((id) => `${st.players[id].name} ATK ${st.res[id].atk}`).join(", ") + ")" : " (alone)"}.` });
+          st.log.push({ r: st.round, k: "spot", zone: z.name, holder: w, text: `${z.name}: ${st.players[w].name} ${before === w ? "keeps it" : "takes it"}${here.length > 1 ? " (" + here.map((id) => `${st.players[id].name} ATK ${st.res[id].atk}`).join(", ") + ")" : " (alone)"}.` });
         }
       },
     },
@@ -65,7 +65,7 @@ export default {
         const pl = st.players[z.holder];
         const before = pl.tracks.damage;
         pl.tracks.damage = Math.max(0, before - ctx.p.richHeal);
-        st.log.push({ r: st.round, k: "heal", pid: pl.id, text: `${pl.name} holds the rich ${z.name}: −${before - pl.tracks.damage} damage.` });
+        st.log.push({ r: st.round, k: "heal", pid: pl.id, d: pl.tracks.damage - before, text: `${pl.name} holds the rich ${z.name}: −${before - pl.tracks.damage} damage.` });
       },
     },
   ],
@@ -76,7 +76,7 @@ export default {
       if (!held) continue;
       const before = pl.tracks.damage;
       pl.tracks.damage = Math.max(0, before - held * ctx.p.endPayout);
-      st.log.push({ r: st.round, k: "payout", pid: pl.id, text: `The Vein closes: ${pl.name} holds ${held} Spot${held > 1 ? "s" : ""}, −${before - pl.tracks.damage} damage.` });
+      st.log.push({ r: st.round, k: "payout", pid: pl.id, d: pl.tracks.damage - before, text: `The Vein closes: ${pl.name} holds ${held} Spot${held > 1 ? "s" : ""}, −${before - pl.tracks.damage} damage.` });
     }
   },
 

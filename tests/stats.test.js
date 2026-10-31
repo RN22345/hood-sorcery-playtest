@@ -97,3 +97,53 @@ test("compare: one row per game, averages and seat wins per mode", () => {
   assert.equal(compareCsv(c).trim().split("\n").length, 4);
   assert.match(statsMarkdown(list[0]), /## Survey[\s\S]*Fun \(1–5\):\*\* 4/);
 });
+
+test("log deltas add up to every final score (the presenter's counters rely on it)", () => {
+  for (const mode of Object.values(modes)) {
+    const ok = Object.values(modifiers).filter((m) => !(m.requires?.track && m.requires.track !== mode.win.track) && (m.requires?.modules || []).every((id) => mode.modules.includes(id)));
+    for (const mods of [[], ok]) {
+      const n = mode.players.at(-1);
+      const st = playOut({ mode, modifiers: mods, seats: bots(n), seed: `deltas-${mode.id}-${mods.length}` }, data);
+      const sum = st.players.map(() => 0);
+      for (const e of st.log) {
+        if (e.d != null && e.pid != null) sum[e.pid] += e.d;
+        if (e.ds) for (const [pid, d] of Object.entries(e.ds)) sum[pid] += d;
+      }
+      assert.deepEqual(sum, st.players.map((p) => p.tracks[mode.win.track]), `${mode.id} ${mods.map((m) => m.id)}`);
+      for (const e of st.log.filter((x) => x.zone && "holder" in x)) assert.ok(st.zones.some((z) => z.name === e.zone) || e.zone === "The Turf", e.text);
+    }
+  }
+});
+
+test("narrator beats: fed view by view, score beats end on every final score and claims on every holder", async () => {
+  const { buildBeats } = await import("../ui/beats.js");
+  for (const [modeId, mods, n] of [["corners", ["locations", "block-corner"], 4], ["hold-the-block", ["call-out"], 4], ["posted-up", ["run-it-up"], 3], ["classic", ["pass-the-tab"], 4]]) {
+    const setup = { mode: modes[modeId], modifiers: mods.map((id) => modifiers[id]), seats: bots(n), seed: `beats-${modeId}` };
+    let st = createGame(setup, data), pos = 0;
+    const track = st.mode.win.track;
+    const score = st.players.map(() => 0), holders = {};
+    const kinds = new Set();
+    const feed = () => {
+      const v = viewFor(st, data, 0);
+      for (const pace of ["each", "together"]) {
+        const beats = buildBeats(v.log.slice(pos), v, pace);
+        if (pace === "together") continue;
+        for (const b of beats) {
+          kinds.add(b.type);
+          if (b.type === "score") for (const x of b.deltas) score[x.pid] += x.d;
+          if (b.type === "claim") holders[b.zone] = b.holder;
+        }
+      }
+      pos = v.log.length;
+    };
+    feed();
+    while (!st.over) {
+      const pid = st.pending.who.find((id) => !(id in st.pending.answers));
+      st = act(st, data, { pid, value: botChoice(st, data, pid) }).state;
+      feed();
+    }
+    assert.deepEqual(score, st.players.map((p) => p.tracks[track]), modeId);
+    for (const z of st.zones) if (z.name in holders) assert.equal(holders[z.name], z.holder, `${modeId} ${z.name}`);
+    for (const k of ["round", "wheel", "reveal", "totals", "end"]) assert.ok(kinds.has(k), `${modeId} has ${k} beats`);
+  }
+});

@@ -1,93 +1,178 @@
-// Game feel: a persistent effects layer above the screens (banners, the Wheel reel) and tiny synthesized
-// sounds. It lives outside #app, so re-rendering the screen never restarts an animation. No assets, no rules.
+// Game feel: a persistent effects layer above the screens (banners, the Wheel reel, floating numbers, dice,
+// claim flashes), sound effects (CC0 samples, see assets/audio/CREDITS.md) and music. It lives outside #app,
+// so re-rendering a screen never restarts an animation. No rules here.
 const layer = document.createElement("div");
 layer.className = "fx";
 layer.innerHTML = '<div class="fx-stage"></div>';
 document.body.appendChild(layer);
 const stage = layer.firstChild;
 
-let muted = localStorage.getItem("hsp:muted") === "1";
-export const isMuted = () => muted;
-export function toggleMute() { muted = !muted; localStorage.setItem("hsp:muted", muted ? "1" : "0"); return muted; }
+// ---------------------------------------------------------------- settings (volumes)
+const SKEY = "hsp:audio";
+const audio = Object.assign({ music: 0.45, sfx: 0.8, muted: false }, JSON.parse(localStorage.getItem(SKEY) || "{}"));
+export const audioSettings = () => ({ ...audio });
+export function setAudio(patch) {
+  Object.assign(audio, patch);
+  localStorage.setItem(SKEY, JSON.stringify(audio));
+  if (sfxGain) sfxGain.gain.value = audio.muted ? 0 : audio.sfx;
+  applyMusicVolume();
+}
+export const isMuted = () => audio.muted;
+export function toggleMute() { setAudio({ muted: !audio.muted }); return audio.muted; }
+
+// ---------------------------------------------------------------- positions in stage pixels
+/** The rectangle of a DOM element in 1920×1080 stage coordinates (works in both layouts). */
+export function stageRect(el) {
+  const fr = stage.getBoundingClientRect(), r = el.getBoundingClientRect(), s = fr.width / 1920;
+  return { x: (r.left - fr.left) / s, y: (r.top - fr.top) / s, w: r.width / s, h: r.height / s };
+}
+function put(el, cls, html, rect, ms) {
+  const d = document.createElement("div");
+  d.className = cls;
+  d.innerHTML = html;
+  if (rect) Object.assign(d.style, { left: rect.x + "px", top: rect.y + "px", width: rect.w + "px", height: rect.h + "px" });
+  if (ms) d.style.setProperty("--ms", ms + "ms");
+  stage.appendChild(d);
+  if (ms) setTimeout(() => d.remove(), ms + 120);
+  return d;
+}
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 /** Remove every running effect (on screen changes). */
 export function clearFx() { stage.replaceChildren(); }
 
 /** A big title across the table for a moment. */
 export function banner(title, sub = "", { color = "", ms = 1500, cls = "" } = {}) {
-  const el = document.createElement("div");
-  el.className = `banner ${cls}`;
-  el.style.setProperty("--c", color || "var(--gold)");
-  el.style.setProperty("--ms", ms + "ms");
-  el.innerHTML = `<b></b><span></span>`;
-  el.firstChild.textContent = title;
-  el.lastChild.textContent = sub;
-  stage.appendChild(el);
-  setTimeout(() => el.remove(), ms + 100);
+  const d = put(null, `banner ${cls}`, `<b>${esc(title)}</b><span>${esc(sub)}</span>`, null, ms);
+  d.style.setProperty("--c", color || "var(--gold)");
+}
+
+/** A number or word that pops out of an element and floats up ("+2", "+1 Rep", "−1"). */
+export function floatText(el, text, cls = "", ms = 1400) {
+  if (!el) return;
+  const r = stageRect(el);
+  put(null, `floater ${cls}`, esc(text), { x: r.x, y: r.y + r.h * 0.3, w: r.w, h: 0 }, ms);
+}
+
+/** A glow ring over an element (a corner changing hands, a crew in focus). */
+export function flash(el, color = "var(--gold)", ms = 1100) {
+  if (!el) return;
+  put(null, "flash", "", stageRect(el), ms).style.setProperty("--c", color);
+}
+
+/** Dice tumble over an element and land on the rolled faces. */
+export function dice(el, faces, ms = 1100) {
+  if (!el || !faces.length) return;
+  const r = stageRect(el);
+  const d = put(null, "dice", faces.map(() => `<i class="die"></i>`).join(""), { x: r.x, y: r.y, w: r.w, h: r.h }, ms + 900);
+  const dies = [...d.children];
+  let t = 0;
+  const roll = () => {
+    dies.forEach((x) => (x.dataset.f = 1 + Math.floor(Math.random() * 6))); // cosmetic tumble; the result is decided
+    t += 70;
+    if (t < ms * 0.6) setTimeout(roll, 70);
+    else { dies.forEach((x, i) => { x.dataset.f = faces[i]; x.classList.add("landed"); }); }
+  };
+  sound("dice");
+  roll();
 }
 
 /** The Wheel: sector images flick past, slow down and land on the result. */
 export function wheelReel(sectors, landed, ms = 1500) {
-  const el = document.createElement("div");
-  el.className = "reel";
-  el.innerHTML = `<div class="reel-box"><img alt=""><b></b><span></span></div>`;
+  const el = put(null, "reel", `<div class="reel-box"><img alt=""><b></b><span></span></div>`);
   const img = el.querySelector("img"), name = el.querySelector("b"), text = el.querySelector("span");
-  stage.appendChild(el);
   let t = 0, k = Math.floor(Math.random() * sectors.length); // cosmetic only: the result is already decided
+  sound("spin");
   const tick = () => {
     const s = sectors[k++ % sectors.length];
     img.src = s.img; name.textContent = s.name; text.textContent = "";
-    sound("tick");
+    sound("tick", { vol: 0.35 });
     t += 40 + t * 0.18;
     if (t < ms * 0.55) setTimeout(tick, 40 + t * 0.18);
     else setTimeout(() => {
       img.src = landed.img; name.textContent = landed.name; text.textContent = landed.text;
       el.classList.add("landed", landed.type);
       sound(landed.type === "curse" ? "curse" : "bless");
-      setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 400); }, 1000);
+      setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 400); }, 900);
     }, 140);
   };
   tick();
 }
 
-// ---------------------------------------------------------------- sound (Web Audio, synthesized)
-let ac = null;
+// ---------------------------------------------------------------- sound effects (Web Audio + CC0 samples)
+const SFX = {
+  pick: ["card_pick1", "card_pick2"], place: ["card_place1", "card_place2"], card: ["card_place1", "card_place2"],
+  flip: ["card_flip"], fan: ["card_fan"], shuffle: ["shuffle"], chips: ["chips"], chip: ["chip"],
+  dice: ["dice1", "dice2"], hit: ["hit1", "hit2"], lock: ["lock"], whoosh: ["whoosh", "whoosh2"], spin: ["spin"],
+  tick: ["tick"], click: ["click"], select: ["select"], confirm: ["confirm"], error: ["error"], back: ["back"], toggle: ["toggle"],
+  bless: ["bless"], curse: ["curse"], heal: ["heal"], turn: ["turn"], win: ["win"], bell: ["bell"],
+};
+const VOL = { tick: 0.4, select: 0.5, whoosh: 0.6, chips: 0.8, hit: 0.9, win: 0.9, turn: 0.6, flip: 0.8 };
+let ac = null, sfxGain = null;
+const buffers = {};
 function ctx() {
-  if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } }
+  if (!ac) {
+    try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; }
+    sfxGain = ac.createGain();
+    sfxGain.gain.value = audio.muted ? 0 : audio.sfx;
+    sfxGain.connect(ac.destination);
+    for (const f of new Set(Object.values(SFX).flat())) {
+      fetch(`assets/audio/${f}.mp3`).then((r) => r.arrayBuffer()).then((b) => ac.decodeAudioData(b)).then((buf) => (buffers[f] = buf)).catch(() => {});
+    }
+  }
   if (ac.state === "suspended") ac.resume();
   return ac;
 }
-function tone(f, at, dur, { type = "sine", vol = 0.12, slide = 0 } = {}) {
-  const a = ctx(); if (!a) return;
-  const o = a.createOscillator(), g = a.createGain();
-  o.type = type; o.frequency.setValueAtTime(f, a.currentTime + at);
-  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f + slide), a.currentTime + at + dur);
-  g.gain.setValueAtTime(0.0001, a.currentTime + at);
-  g.gain.exponentialRampToValueAtTime(vol, a.currentTime + at + 0.01);
-  g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + at + dur);
-  o.connect(g).connect(a.destination);
-  o.start(a.currentTime + at); o.stop(a.currentTime + at + dur + 0.02);
+export function sound(name, { vol = 1, rate = 1 } = {}) {
+  if (audio.muted) return;
+  const a = ctx();
+  const list = SFX[name];
+  if (!a || !list) return;
+  const buf = buffers[list[Math.floor(Math.random() * list.length)]];
+  if (!buf) return;
+  const src = a.createBufferSource(), g = a.createGain();
+  src.buffer = buf;
+  src.playbackRate.value = rate * (0.96 + Math.random() * 0.08);
+  g.gain.value = vol * (VOL[name] ?? 1);
+  src.connect(g).connect(sfxGain);
+  src.start();
 }
-function noise(at, dur, vol = 0.08, hp = 1500) {
-  const a = ctx(); if (!a) return;
-  const b = a.createBuffer(1, Math.floor(a.sampleRate * dur), a.sampleRate);
-  const d = b.getChannelData(0);
-  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
-  const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
-  s.buffer = b; f.type = "highpass"; f.frequency.value = hp; g.gain.value = vol;
-  s.connect(f).connect(g).connect(a.destination);
-  s.start(a.currentTime + at);
+
+// ---------------------------------------------------------------- music (looping lo-fi, crossfaded)
+const MUSIC = { menu: ["music_menu"], game: ["music_game1", "music_game2"] };
+let want = null, cur = null, unlocked = false;
+const players = {};
+function applyMusicVolume() { if (cur && !cur.fading) cur.el.volume = audio.muted ? 0 : audio.music; }
+function fade(el, to, ms, done) {
+  const from = el.volume, t0 = performance.now();
+  const step = () => {
+    const k = Math.min(1, (performance.now() - t0) / ms);
+    el.volume = Math.max(0, Math.min(1, from + (to - from) * k));
+    if (k < 1) requestAnimationFrame(step); else done?.();
+  };
+  step();
 }
-const SOUNDS = {
-  tick: () => tone(1800, 0, 0.03, { type: "square", vol: 0.03 }),
-  card: () => noise(0, 0.06, 0.06, 2500),
-  lock: () => { tone(160, 0, 0.18, { type: "triangle", vol: 0.2, slide: -60 }); noise(0, 0.05, 0.05, 800); },
-  flip: () => { for (let i = 0; i < 4; i++) noise(i * 0.07, 0.07, 0.07, 3000); },
-  bless: () => { tone(523, 0, 0.18); tone(784, 0.1, 0.3); },
-  curse: () => { tone(220, 0, 0.3, { type: "sawtooth", vol: 0.06, slide: -80 }); },
-  coin: () => { tone(988, 0, 0.08, { type: "square", vol: 0.05 }); tone(1319, 0.07, 0.2, { type: "square", vol: 0.05 }); },
-  hit: () => { tone(110, 0, 0.25, { type: "triangle", vol: 0.25, slide: -50 }); noise(0, 0.12, 0.08, 300); },
-  turn: () => { tone(660, 0, 0.12, { vol: 0.08 }); tone(880, 0.12, 0.16, { vol: 0.08 }); },
-  win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.13, 0.35, { type: "triangle", vol: 0.12 })),
-};
-export function sound(name) { if (!muted) try { SOUNDS[name]?.(); } catch {} }
+/** Play the menu or game music ("menu" | "game" | null), crossfading. Starts after the first click (autoplay rules). */
+export function music(kind) {
+  want = kind;
+  if (!unlocked) return;
+  if (cur?.kind === kind) return;
+  const old = cur;
+  if (old) { old.fading = true; fade(old.el, 0, 900, () => old.el.pause()); }
+  cur = null;
+  if (!kind) return;
+  const list = MUSIC[kind];
+  const file = list[Math.floor(Math.random() * list.length)];
+  const el = players[file] ||= Object.assign(new Audio(`assets/audio/${file}.mp3`), { loop: true, preload: "none" });
+  el.volume = 0;
+  el.currentTime = 0;
+  el.play().catch(() => {});
+  cur = { kind, el };
+  fade(el, audio.muted ? 0 : audio.music, 1500);
+}
+addEventListener("pointerdown", () => {
+  if (unlocked) return;
+  unlocked = true;
+  ctx();
+  if (want) music(want);
+}, { capture: true });
