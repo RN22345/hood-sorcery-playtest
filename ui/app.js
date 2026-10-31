@@ -9,10 +9,13 @@ import { modifierProblems } from "../engine/registry.js";
 import { castProblem, allowedZones } from "../engine/cast.js";
 import { Host, Client } from "../net/peer.js";
 import * as V from "./views.js";
+import { roundSummary } from "../engine/summary.js";
 import { md } from "./md.js";
 import { Timer, computeStats, statsMarkdown, statsCsv, parseStatsFile, compareStats, compareMarkdown, compareCsv } from "./stats.js";
 import { buildReplay } from "./replay.js";
 import { statsPanel, statsImage } from "./statsView.js";
+import "./stage.js";
+import { banner, wheelReel, sound, toggleMute, isMuted, clearFx } from "./fx.js";
 
 const root = document.getElementById("app");
 const getJson = (p) => fetch(p).then((r) => { if (!r.ok) throw new Error(`${p}: ${r.status}`); return r.json(); });
@@ -28,7 +31,8 @@ const app = {
   draft: { key: "", zone: 0, lines: {}, thumbs: [], pick: [] }, allowedZones: [], castProblem: null,
   net: { code: null, status: "", seatNames: {}, conn2seat: {} },
   showLog: !window.matchMedia?.("(max-width: 900px)").matches, error: "", lobbyError: "", survey: { best: "", obvious: "", reads: "", fun: "" }, modal: null,
-  botDelay: 220,
+  botDelay: 650, // bots "think" a moment, so a table of bots reads like players, not a script
+  muted: isMuted(), fxSeen: { round: 0, over: false, turn: "" },
   reveal: { seen: 0, until: 0, fresh: false }, // the few seconds after a round's cards flip
   modProblem(mode, m) { return modifierProblems(mode, m)[0] || ""; },
   netSeats: () => netSeats(),
@@ -69,11 +73,11 @@ function prepareDraft(v) {
   const key = `${v.round}|${v.stepIdx}|${v.you}|${c?.step}|${v.log.length}`;
   if (key !== app.draft.key) {
     const zones = c?.type === "cast" ? allowedZones(v, makeCtx(v, app.data), v.you) : [];
-    app.draft = { key, zone: zones[0] ?? 0, lines: {}, thumbs: [], pick: [] };
+    app.draft = { key, zone: c?.prefill?.zone ?? zones[0] ?? 0, lines: c?.prefill ? { [c.prefill.zone]: [...c.prefill.cards] } : {}, thumbs: [], pick: [] };
     app.allowedZones = zones;
     app.error = app.error && app.role === "client" ? app.error : "";
   }
-  if (c?.type === "cast") app.castProblem = castProblem(v, makeCtx(v, app.data), v.you, draftCast());
+  if (c?.type === "cast") app.castProblem = castProblem(v, makeCtx(v, app.data), v.you, draftCast(), c.limits);
 }
 
 // A round's lines become visible either mid-round (v.revealed, e.g. before Flip the Script) or, when
@@ -95,15 +99,19 @@ function draftCast() {
 
 function render() {
   let html;
+  if (app.screen !== app.lastScreen) { clearFx(); app.lastScreen = app.screen; }
   if (app.screen === "stats") {
-    const panels = app.statsList.map((s, i) => statsPanel(s, i, app.statsLogs?.[i]?.actions ? `<button class="primary" data-act="replay" data-i="${i}">Replay this game</button>` : "")).join("");
-    const cmp = app.statsList.length > 1 ? compareStats(app.statsList) : null;
-    html = V.statsScreen(app, panels, cmp && md(compareMarkdown(cmp)));
+    const tab = app.statsTab ?? "0";
+    const body = tab === "compare"
+      ? V.compareBody(app.statsList.length, md(compareMarkdown(compareStats(app.statsList))))
+      : statsPanel(app.statsList[+tab], +tab, app.statsLogs?.[+tab]?.actions ? `<button class="primary" data-act="replay" data-i="${tab}">Replay this game</button>` : "");
+    html = V.statsScreen(app, body);
   } else if (app.screen === "replay") {
     const v = replayView();
     if (app.reveal.seen > (v.revealed ? v.round : v.round - 1)) app.reveal.seen = 0; // stepping back: flip again later
     trackReveal(v);
-    html = V.game(app, v, { panel: V.replayPanel(app, v, app.rp) });
+    gameFx(v);
+    html = V.game(app, v, { panel: V.replayPanel(app, v, app.rp), side: V.replayHands(app, v) });
     app.reveal.fresh = false;
   } else if (app.screen === "lobby") {
     app.recentStats = store.get("recentStats", []);
@@ -114,15 +122,42 @@ function render() {
     if (!v) { root.innerHTML = "<p class='muted'>Waiting for the host…</p>"; return; }
     prepareDraft(v);
     trackReveal(v);
+    gameFx(v);
     (app.timer ||= new Timer(Date.now())).observe(v, Date.now());
     if (v.over && !app.statsSaved) { app.statsSaved = true; rememberStats(computeStats(gameRecord())); }
     html = V.game(app, v);
     app.reveal.fresh = false; // the flip animates once; later renders keep only the highlights
   }
-  if (app.modal) html += V.rulesModal(app, app.modal);
-  root.innerHTML = html;
+  // every screen sits on the scaled 1920×1080 stage (ui/stage.js); modals live inside it so they scale too
+  root.innerHTML = `<div class="stage screen-${app.screen}">${html}${app.modal ? V.rulesModal(app, app.modal) : ""}</div>`;
   const log = root.querySelector(".log");
   if (log) log.scrollTop = log.scrollHeight;
+}
+
+// Banners, the Wheel reel and sounds when something happens (new round, flip, your turn, game over).
+function gameFx(v) {
+  const seen = app.fxSeen;
+  if (v.round && v.round !== seen.round && !v.over) {
+    seen.round = v.round;
+    const sector = app.data.wheel.find((w) => w.id === v.wheel);
+    banner(`Round ${v.round}`, `of ${v.mode.params.rounds}`, { ms: 1100, cls: "small" });
+    if (sector) setTimeout(() => wheelReel(app.data.wheel, sector), 500);
+  }
+  if (app.reveal.fresh) {
+    sound("flip");
+    const s = roundSummary(v);
+    const mine = s?.round === app.revealing && v.you != null ? s.items.filter((i) => i.pid === v.you) : [];
+    if (mine.length) setTimeout(() => sound(mine.some((i) => i.kind === "damage" && i.delta > 0) || mine.some((i) => i.kind === "lose") ? "hit" : "coin"), 650);
+  }
+  const turn = v.choice ? `${v.round}|${v.stepIdx}|${v.choice.step}|${v.you}` : "";
+  if (turn && turn !== seen.turn) sound("turn");
+  seen.turn = turn;
+  if (v.over && !seen.over) {
+    seen.over = true;
+    const w = v.players[v.result.order[0]];
+    banner(`${w.name} takes it`, "The Vein closes", { color: w.color, ms: 2600, cls: "final" });
+    sound("win");
+  }
 }
 
 // ------------------------------------------------------------------ game flow (local / host)
@@ -147,6 +182,7 @@ function startGame() {
   app.lobbyError = "";
   app.reveal = { seen: 0, until: 0, fresh: false };
   app.timer = new Timer(Date.now()); app.statsSaved = false;
+  app.fxSeen = { round: 0, over: false, turn: "" };
   changed();
 }
 
@@ -198,6 +234,7 @@ function leave() {
   clearTimeout(app.botTimer); clearTimeout(app.revealTimer);
   app.reveal = { seen: 0, until: 0, fresh: false };
   app.timer = null; app.statsSaved = false;
+  app.fxSeen = { round: 0, over: false, turn: "" };
   app.net.host?.close(); app.net.client?.close();
   Object.assign(app, { screen: "lobby", role: null, st: null, view: null, seat: null, remoteLobby: null, remoteNet: null, onlineSeats: [], error: "" });
   app.net = { code: null, status: "", seatNames: {}, conn2seat: {} };
@@ -371,6 +408,7 @@ async function loadStatsFiles(files) {
 
 function showStats(list, logs = []) {
   app.statsList = list;
+  app.statsTab = list.length > 1 ? "compare" : "0";
   app.statsLogs = logs;
   app.screen = "stats";
   app.modal = null;
@@ -386,6 +424,7 @@ function openReplay(log, back) {
   app.modal = null;
   app.cover = null; app.localCount = 0;
   app.reveal = { seen: 0, until: 0, fresh: false };
+  app.fxPrev = app.fxSeen; app.fxSeen = { round: 0, over: true, turn: "" }; // no win fanfare inside a replay
   app.screen = "replay";
   render();
   scrollTo(0, 0);
@@ -425,6 +464,7 @@ function closeReplay() {
   replayPlay(false);
   const back = app.rp?.back || "lobby";
   app.rp = null;
+  app.fxSeen = app.fxPrev || { round: 0, over: false, turn: "" };
   app.screen = back;
   if (back === "game") updateFocus();
   render();
@@ -484,7 +524,7 @@ root.addEventListener("click", (e) => {
     case "thumbAdd": d.thumbs.push(d.zone); break;
     case "thumbDel": d.thumbs.pop(); break;
     case "clear": d.lines = {}; d.thumbs = []; break;
-    case "lock": submit(draftCast()); return;
+    case "lock": sound("lock"); submit(draftCast()); return;
     case "download": download(); return;
     case "reconnect": reconnect(); return;
     case "stats": openStats(); return;
@@ -496,6 +536,9 @@ root.addEventListener("click", (e) => {
     case "recentStats": showStats([app.recentStats[+t.dataset.i]]); return;
     case "recentAll": showStats(app.recentStats); return;
     case "statsBack": app.screen = "lobby"; app.statsList = []; break;
+    case "statsTab": app.statsTab = t.dataset.i; break;
+    case "seatKind": app.lob.seats[+t.dataset.i].kind = t.dataset.v; saveLobby(); break;
+    case "sound": app.muted = toggleMute(); break;
     case "seatBot": case "seatHuman":
       if (app.role !== "host") return;
       app.st = setSeatKind(app.st, +t.dataset.i, t.dataset.act === "seatBot" ? "bot" : "human");
@@ -520,6 +563,7 @@ function clickCard(id, elx) {
       if (!d.lines[z].length) { delete d.lines[z]; d.thumbs = d.thumbs.filter((t) => t !== z); }
     } else if (elx.closest(".hand-cards") && !Object.values(d.lines).flat().includes(id)) {
       (d.lines[d.zone] ||= []).push(id);
+      sound("card");
     }
   } else return;
   render();

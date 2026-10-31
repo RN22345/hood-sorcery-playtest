@@ -13,16 +13,20 @@ against bots, or online with a room code. No install, no account, no server.
 | **Hold the Block** | P2 | One Vein corner: the holder heals but the whole Street hits them. Stay or bail? |
 | **Posted Up** | P15 | Classic + pick a Spot each round; highest ATK takes it; the rich Spot heals; Spots pay at the end |
 
-**Modifiers:** Call Out (P16) · Pass the Tab (P12) · Specialist matrix · Forecast · 4 corners · Block heals 1 ·
-3 Thumbs · Short game (4 rounds).
+**Modifiers:** Call Out (P16) · Pass the Tab (P12) · Run It Up (P4) · Specialist matrix · Forecast · 4 corners ·
+Corner locations (P1) · Block corner (P1+P2) · Open first card (P1) · Rep upkeep · Block heals 1 · 3 Thumbs ·
+Short game (4 rounds).
+
+Built for a desktop browser at any size from 480p to 4K: the whole table always fits the window, with no
+scrolling. On a phone it switches to a scrolling layout. 🔊 in the top bar mutes the sound.
 
 ---
 
 ## Quick guide
 
-1. **Open the link.** Pick a **mode**, tick any **modifiers**, and set each **seat**: *Human (this device)*, *Bot*
-   or *Online player*.
-2. **Same room, one device:** leave online seats out and press **Start on this device**. When it's a human's
+1. **Open the link.** Pick a **mode**, tap any **modifiers**, and set each **crew** to *Human* (this device),
+   *Bot* or *Online*. Then press **Play**.
+2. **Same room, one device:** leave online seats out and press **Play**. When it's a human's
    turn the screen says *Pass the device to …*; only that player taps *show my hand*.
 3. **Online:** set some seats to *Online player*, press **Open online room**, and send friends the **room
    code** (or the invite link). They open the same page, type a name and the code under *Join a friend's
@@ -30,8 +34,8 @@ against bots, or online with a room code. No install, no account, no server.
    drops, they press **Reconnect** (or rejoin with the **same name**) and get their seat back; meanwhile the
    host can press **Bot takes over** so the game doesn't stall.
 4. **Playing a round:** the Wheel spins by itself. On your turn click a **zone** (Corners: a corner), then
-   click cards in your hand to add them to the line, in order. Click a card in the line to take it back.
-   **+ Thumbs** commits Trigger Thumbs. **Lock in** lights up when the line is legal.
+   click cards in your hand (the fan at the bottom) to add them to the line, in order. Click a card in the line to take it back.
+   **+ Thumbs** commits Trigger Thumbs. **Cast** lights up when the line is legal.
 5. **After each round** the cards flip face up for a few seconds: each crew's line shows in its box, the
    corners that changed hands glow, and a **round summary** line ("Round 3: Ana +1 damage · Ben took the Lot")
    stays above the action panel. On a phone the hand scrolls sideways and sits at the bottom of the screen.

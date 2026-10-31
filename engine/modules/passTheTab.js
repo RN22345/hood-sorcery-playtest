@@ -17,7 +17,9 @@ export default {
     {
       id: "openTab", phase: "RESOLVE", order: 15, kind: "auto",
       run(st) {
-        const score = (pid) => st.ranks.atk.indexOf(pid) + st.ranks.blk.indexOf(pid);
+        // crews outside the ranking (folded in Run It Up) count as last
+        const at = (o, pid) => (o && o.includes(pid) ? o.indexOf(pid) : st.players.length);
+        const score = (pid) => at(st.ranks?.atk, pid) + at(st.ranks?.blk, pid);
         st.ext.tab = { order: st.players.map((p) => p.id).sort((a, b) => st.rd[b] - st.rd[a] || score(b) - score(a)), i: 0 };
       },
     },

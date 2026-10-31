@@ -12,7 +12,7 @@ export function allowedZones(st, ctx, pid) {
   return [0];
 }
 
-export function castProblem(st, ctx, pid, v) {
+export function castProblem(st, ctx, pid, v, limits = st.limits) {
   if (!v || !Array.isArray(v.lines)) return "Malformed cast";
   const pl = st.players[pid];
   const allowed = allowedZones(st, ctx, pid);
@@ -32,8 +32,8 @@ export function castProblem(st, ctx, pid, v) {
     fingers += lineStats(ln.cards.map(ctx.card)).len;
   }
   if (count < ctx.p.minCards) return `Cast at least ${ctx.p.minCards} card`;
-  if (count > st.limits.maxCards) return `Cast at most ${st.limits.maxCards} cards this round`;
-  if (fingers > st.limits.line) return `Your line is ${fingers} fingers; the limit is ${st.limits.line}`;
+  if (count > limits.maxCards) return `Cast at most ${limits.maxCards} card${limits.maxCards === 1 ? "" : "s"} ${limits === st.limits ? "this round" : "here"}`;
+  if (fingers > limits.line) return `Your line is ${fingers} fingers; the limit is ${limits.line}`;
   const th = v.thumbs || [];
   if (!Array.isArray(th)) return "Malformed Thumbs";
   if (th.length > 2) return "Commit at most 2 Thumbs a round";
@@ -86,4 +86,20 @@ export function botThumbs(st, ctx, pid, zone) {
   if (left === 0) return Array(Math.min(2, pl.thumbs)).fill(zone);
   if (pl.thumbs > left || r() < 0.12) return [zone];
   return [];
+}
+
+/**
+ * Make a bot's cast legal under every module's extra rules (location cards, the opened card…): drop the last
+ * card of the longest line until castProblem() is happy. Valid casts come back unchanged.
+ */
+export function repairCast(st, ctx, pid, cast) {
+  let c = cleanCast(cast);
+  for (let guard = 0; castProblem(st, ctx, pid, c) && guard < 20; guard++) {
+    const lines = c.lines.filter((l) => l.cards.length);
+    if (lines.reduce((a, l) => a + l.cards.length, 0) <= 1) break;
+    const longest = lines.reduce((a, l) => (l.cards.length > a.cards.length ? l : a));
+    longest.cards.pop();
+    c = { lines: c.lines.filter((l) => l.cards.length), thumbs: c.thumbs.filter((z) => c.lines.some((l) => l.zone === z && l.cards.length)) };
+  }
+  return c;
 }

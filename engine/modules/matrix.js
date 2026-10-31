@@ -12,7 +12,9 @@ export default {
     {
       id: "matrix", phase: "RESOLVE", order: 10, kind: "auto",
       run(st, ctx) {
-        const pids = st.players.map((p) => p.id);
+        // Run It Up: folded crews skip the ranking; the stake multiplies the matrix
+        const pids = st.players.map((p) => p.id).filter((id) => !st.folded?.includes(id));
+        if (pids.length < 2) { st.ranks = null; return; }
         let atkOrder = rankStat(st, pids, "atk");
         let blkOrder = rankStat(st, pids, "blk");
         if (st.fx === "rotateAtk") atkOrder = rotate(atkOrder);
@@ -22,7 +24,7 @@ export default {
         st.ranks = { atk: atkOrder, blk: blkOrder };
         for (const pid of pids) {
           const a = atkOrder.indexOf(pid), b = blkOrder.indexOf(pid);
-          let d = M[a][b];
+          let d = M[a][b] * (st.stake || 1);
           if (st.fx === "bleeding") d += (a === last ? 1 : 0) + (b === last ? 1 : 0);
           st.rd[pid] += d;
         }

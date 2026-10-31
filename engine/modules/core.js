@@ -2,7 +2,7 @@
 // damage (Thumb 6), refill, end of game. Every mode includes this module.
 import { rand, d6 } from "../rng.js";
 import { lineStats, clamp } from "../line.js";
-import { castProblem, cleanCast, bestLine, botThumbs, botRng } from "../cast.js";
+import { castProblem, cleanCast, bestLine, botThumbs, botRng, repairCast } from "../cast.js";
 
 const names = (st, pids) => pids.map((id) => st.players[id].name).join(", ");
 
@@ -64,16 +64,25 @@ export default {
     },
     {
       id: "cast", phase: "CAST", order: 50, kind: "choice",
-      spec: (st, ctx, pid) => ({ type: "cast", prompt: "Build your line and lock it in.", limits: st.limits }),
+      spec(st, ctx, pid) {
+        // a module may pre-place cards the crew must cast (e.g. the opened card)
+        const prefill = ctx.mods.map((m) => m.castPrefill?.(st, ctx, pid)).find(Boolean) || null;
+        return { type: "cast", prompt: "Build your line and lock it in.", limits: st.limits, prefill };
+      },
       validate: (st, ctx, pid, v) => castProblem(st, ctx, pid, v),
       apply(st, ctx, answers) {
         for (const pid in answers) st.casts[pid] = cleanCast(answers[pid]);
         st.log.push({ r: st.round, k: "cast", text: "Everyone has cast." });
       },
       bot(st, ctx, pid) {
-        for (const m of ctx.mods) if (m.botCast) return m.botCast(st, ctx, pid);
-        const l = bestLine(st, ctx, pid, (l) => l.atk + l.blk - l.len * 0.05);
-        return { lines: [{ zone: 0, cards: l.cards }], thumbs: botThumbs(st, ctx, pid, 0) };
+        let c = null;
+        for (const m of ctx.mods) if (m.botCast) { c = m.botCast(st, ctx, pid); break; }
+        if (!c) {
+          const l = bestLine(st, ctx, pid, (l) => l.atk + l.blk - l.len * 0.05);
+          c = { lines: [{ zone: 0, cards: l.cards }], thumbs: botThumbs(st, ctx, pid, 0) };
+        }
+        for (const m of ctx.mods) c = m.adjustBotCast?.(st, ctx, pid, c) || c;
+        return repairCast(st, ctx, pid, c);
       },
     },
     {
@@ -83,6 +92,7 @@ export default {
         for (const pl of st.players) {
           const cast = st.casts[pl.id];
           const lines = cast.lines.map((ln) => ({ zone: ln.zone, cards: ln.cards, ...lineStats(ln.cards.map(ctx.card)) }));
+          for (const ln of lines) for (const m of ctx.mods) m.adjustLine?.(st, ctx, pl.id, ln); // location cards etc.
           const rolls = [];
           let six = 0;
           for (const z of cast.thumbs) {

@@ -33,6 +33,19 @@ These were not in the pathway draft and were filled in to make the mode playable
 
 - **Thumb 6** = **+1 Rep** (there is no damage in Corners).
 - Mugged / Sabotage / Bleeding readings above (the draft only defined The Turf and Mugged loosely).
-- Corner location cards (Laundromat, Rooftop, Bodega…) are **not in yet**: plain corners only.
+- **Corner locations** modifier (one location per corner, dealt at setup). Only the six named in the DEVLOG
+  are in; the pathway doc lists ~12. Readings:
+  - **Laundromat** "💧 seams +2 BLK": a water seam under it gives +2 BLK instead of +1.
+  - **Rooftop** "max 1 card": a line under it has at most 1 card.
+  - **Bodega** "pays 2 Rep": its holder gets 2 Rep a round instead of 1.
+  - **Precinct** "loser +1 damage": Corners has no damage, so every crew that *casts there and loses* −1 Rep.
+  - **Subway Grate** "no seams": no seam bonus *and* no −1 length there (counts against your 8 fingers).
+  - **Old Church** "ties to challenger": like Sabotage, only at that corner.
+- **Block corner** modifier (P1+P2): the first corner becomes *The Block*; its "heal" reads as **+1 Rep a round**
+  for the holder (Corners has no damage). Change `blockRep` in `data/modifiers.json`.
+- **Open first card** modifier: before casting, each crew picks 1 card and 1 corner at once; all are shown;
+  that card must **lead** the line at that corner (it counts toward the 8 fingers and 3 cards). No Thumbs on it.
+- **Rep upkeep** modifier (snowball fix): each corner held **beyond the second** costs 1 Rep that round
+  (`repUpkeepFrom: 3`). The draft only says "Rep upkeep"; the threshold is a guess.
 
 **Try:** the "4 corners" modifier (the draft's open question: is a crew locked out too often with 3?).

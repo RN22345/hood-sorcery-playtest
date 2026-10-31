@@ -61,6 +61,14 @@ The printed rules authority is **SRD v3.10.20**; the modes here are playtest var
 - **UI** (`ui/`): `app.js` is the controller (lobby, local/host/client roles, hot-seat cover screen, bot
   timer), `views.js` returns HTML strings, `md.js` renders the rules pages. UI code never decides rules;
   it calls `castProblem` for live feedback and the engine for everything else.
+  - **Stage** (`stage.js`): every screen is laid out on a **1920×1080 stage** scaled to fit the window
+    (letterboxed), the same model as a Unity Canvas Scaler with a 1920×1080 reference. Desktop from 480p to
+    4K shows everything without scrolling. Narrow or portrait windows (`body.flow`) get a scrolling layout.
+    Screen regions (game): top bar · side (round, Wheel, limits, connections) · opponents · board (zones,
+    round summary, action panel) · your crew · your hand (a fan) · log. These map one-to-one to Unity panels.
+  - **Effects** (`fx.js`): banners ("Round 3", the winner), the Wheel reel at round start and short
+    synthesized sounds (Web Audio, no files; mute in the top bar). A separate layer, so re-renders never
+    restart an animation.
 - **Online** (`net/peer.js`): PeerJS 1.5.4 (WebRTC, free public signalling broker), star topology, host is
   authoritative and sends each client `viewFor(state, seat)`. Rejoin with the same name gets the seat back.
   Hidden info is safe from other clients, not from the host (fine for playtests).
@@ -77,6 +85,14 @@ The printed rules authority is **SRD v3.10.20**; the modes here are playtest var
 | forecast | `modules/forecast.js` | P15 modifier: pre-rolls next round's rich Spot from round 4 |
 | callOut | `modules/callOut.js` | P16: spend a Thumb to call out a rival (local to your Spot in Posted Up) |
 | passTheTab | `modules/passTheTab.js` | P12: worst crew may pay a Thumb to swap damage down the line |
+| locations | `modules/locations.js` | P1: a location card per corner (Laundromat, Rooftop, Bodega, Precinct, Subway Grate, Old Church) |
+| blockCorner | `modules/blockCorner.js` | P1+P2: the first corner is The Block, +1 Rep to its holder |
+| openCard | `modules/openCard.js` | P1 signal: open one card + corner before casting; it must lead that line |
+| runItUp | `modules/runItUp.js` | P4: fold / call / raise after casting; stakes ×2/×4; folders skip the matrix |
+
+Module hooks (all optional): `init`, `steps`, `effects`, `validateCast`, `botCast`, `adjustBotCast`,
+`castPrefill`, `adjustLine` (after a line's stats, before Thumbs), and for Corners `zoneRep`, `challengerTies`,
+`contestLost`. Bot casts always pass through `repairCast` (cast.js), so a module's extra limits never stall a bot.
 
 ## 3. How to…
 
@@ -127,6 +143,16 @@ in `registry.js` (`rounds 8, hand 8, thumbs 2, line 8, maxCards 3`).
   no screenshot library (html2canvas) is needed.
 - Posted Up's end-of-game payout lands after the last round's history, so stats show it as a separate
   "end of game" adjustment (and an "end" point on the chart) instead of folding it into round 8.
+- **What this site is for (2026-10-31, from the team):** it is the playtest table *and* the visual reference
+  for how the game should look and feel, so the Unity build (desktop first; a mobile port maybe later)
+  matches what was tested. It is not GP2 or GP3 itself. The `engine/` is the rules reference for both the
+  GP2 helper app and the Unity game. Hence the 1920×1080 stage, the regions named above, and game-feel
+  effects living in one place (`fx.js`) that a Unity scene can mirror.
+- Bots now wait 650 ms before answering (was 220 ms), so a table of bots reads like players.
+- Section B readings (all flagged in `modes/corners.md` / `modes/classic.md`): Precinct costs Rep instead of
+  damage; Subway Grate removes the seam's length cut too; the Block's heal = +1 Rep; Rep upkeep from the 3rd
+  corner; Run It Up fold cost 1 and ×2 / ×4 stakes. Posted Up dials D1–D4 are **not done**: their text is in
+  `10_Posted_Up.md` §8, which is not in this repo.
 - Final-standings roll-off uses a d6 plus a hidden tiebreak digit so it never loops; the log shows the d6.
 
 ### Hosting: is GitHub Pages enough?
@@ -158,13 +184,15 @@ Sized so a cloud session can take them one by one. ✅ = done.
    Still to do: try it on a real phone (only checked in a 375 px browser window).
 
 **B. Modes and modifiers from the plan**
-6. **Corner location cards** for P1 (~12, `05_Pathways.md` P1): deal 3 per game; each a small rule hook
+6. ✅ **Corner location cards** for P1 (~12, `05_Pathways.md` P1): deal 3 per game; each a small rule hook
    (Laundromat 💧 seams +2 BLK, Rooftop max 1 card, Bodega pays 2 Rep, Precinct loser +1 damage, Subway Grate no
-   seams, Old Church ties to challenger). Needs art (ART_TODO).
-7. **Run It Up (P4)** modifier: raise / fold simultaneous choices, stakes ×2/×4, folders skip ranking (3- and
+   seams, Old Church ties to challenger). Needs art (ART_TODO). **Done: the six named here; the other ~6
+   need `05_Pathways.md`.**
+7. ✅ **Run It Up (P4)** modifier: raise / fold simultaneous choices, stakes ×2/×4, folders skip ranking (3- and
    2-player matrices exist).
-8. **Block corner** (P1+P2): one corner heals its holder.
-9. Open first card (P1 signal), Corners with Rep upkeep (snowball fix), Posted Up dials D1–D4 (`10_Posted_Up.md` §8).
+8. ✅ **Block corner** (P1+P2): one corner heals its holder.
+9. ✅ Open first card (P1 signal), ✅ Corners with Rep upkeep (snowball fix), ❌ Posted Up dials D1–D4
+   (`10_Posted_Up.md` §8, not in this repo: paste the section into a session to add them).
 10. Tier 3 when asked: P5 Beef, P10 Heat Check, P11 Stash Night, P13 Four Hats, P9 Smuggle Run, P14 Partners.
 
 **C. Data for QA + Business**
@@ -268,3 +296,40 @@ simulator before committing, and append to §6.
     merged), downloaded the comparison .csv, and replayed from a loaded file. Checked at 375 px. No console
     errors.
 - Open: real-network and phone testing of A1. Section B (new modes/modifiers) is next in the backlog.
+
+### 2026-10-31 · Claude Code (cloud, Opus 5.5) · Section B, game-like UI on a scaled 1920×1080 stage
+- **Section B:**
+  - New modifiers: **Corner locations** (6 locations), **Block corner**, **Open first card**, **Rep upkeep**
+    (Corners) and **Run It Up** (any matrix mode).
+  - New engine hooks: `adjustLine`, `castPrefill`, `adjustBotCast`, `zoneRep`, `challengerTies`,
+    `contestLost`, plus `castProblem(..., limits)` and `repairCast`.
+  - Matrix: folded crews skip the ranking and the stake multiplies the damage. Pass the Tab copes with
+    unranked crews.
+  - Readings flagged in `modes/corners.md` and `modes/classic.md`.
+- **UI revamp** (desktop-first, the look Unity should match):
+  - **Stage:** a scaled 1920×1080 stage, letterboxed from 480p to 4K, no page scrolling.
+  - **Title screen:** a logo and crew standees; mode cards; modifier toggles with live descriptions; crew
+    cards with Human/Bot/Online buttons; a big Play button.
+  - **Game table:** opponents across the top with their hands shown as card backs and a "thinking"
+    pulse; the round and the Wheel in a side column; street-corner zones lit in the holder's colour;
+    location strips; a cast panel with a finger meter and a big Cast button; your crew bottom-left; your
+    hand as a fan.
+  - **Effects:** banners and a Wheel reel at round start, a winner banner, synthesized sounds (with mute).
+  - **Stats screen:** tabs (compare / each game).
+  - **Overlays:** modals and the hot-seat cover scale with the stage.
+  - Phones keep a scrolling layout.
+- Verified:
+  - `npm test` (20 tests; new: locations, Block + upkeep, open card incl. bot casts, Run It Up matrix ×2 with
+    a fold) and `node tools/simulate.mjs 50` pass. Run It Up with bots: about 19 average damage against about
+    7 in Classic (flagged).
+  - Playwright at 1920×1080, 1280×720, 854×480 and 3840×2160: lobby and play through casts and reveals in
+    Corners (+locations, Block, open card), Hold the Block, Classic + Run It Up, and Posted Up + Call Out +
+    Forecast. No region clips its content, the page doesn't scroll, and there are no console errors.
+  - The stats export/reload, replay and comparison flows, and the online drop/bot/rejoin/reconnect flow (local
+    signalling server), all re-run on the new layout.
+- Open:
+  - Posted Up dials D1–D4 (need the doc text).
+  - The other ~6 location cards.
+  - Art for locations, the logo, and a table background (ART_TODO).
+  - Run It Up balance.
+  - Possibly drag-and-drop casting.

@@ -45,12 +45,14 @@ export default {
           let winner = z.holder, score = def ? def.ln.blk : 0, runnerUp = null;
           if (order.length) {
             const b = order[0], bAtk = lineOf(b).atk;
-            if (!def || bAtk > def.ln.blk || (bAtk === def.ln.blk && st.fx === "challengerTies")) {
+            const tiesToChallenger = st.fx === "challengerTies" || ctx.mods.some((m) => m.challengerTies?.(st, ctx, z));
+            if (!def || bAtk > def.ln.blk || (bAtk === def.ln.blk && tiesToChallenger)) {
               winner = b; score = bAtk; runnerUp = def ? def.pid : order[1] ?? null;
             } else runnerUp = b;
           }
           z.holder = winner;
           for (const h of here) if (h.pid !== winner) lost.add(h.pid);
+          for (const m of ctx.mods) m.contestLost?.(st, ctx, z, here.map((h) => h.pid).filter((id) => id !== winner));
           out.push({ z, before, winner, score, runnerUp });
           const who = (id) => (id == null ? "nobody" : st.players[id].name);
           const verb = winner == null ? "stays empty" : winner === before ? `held by ${who(winner)}` : `taken by ${who(winner)}`;
@@ -65,11 +67,14 @@ export default {
           }
         }
         for (const pl of st.players) {
-          const held = st.zones.filter((z) => z.holder === pl.id).length;
-          let gain = held * ctx.p.repPerCorner + st.res[pl.id].six;
+          const heldZones = st.zones.filter((z) => z.holder === pl.id);
+          // each corner pays repPerCorner, plus any module bonus (Bodega, the Block); upkeep beyond upkeepFrom corners
+          let gain = heldZones.reduce((a, z) => a + ctx.p.repPerCorner + ctx.mods.reduce((b, m) => b + (m.zoneRep?.(st, ctx, z) || 0), 0), 0) + st.res[pl.id].six;
+          const upkeep = ctx.p.repUpkeepFrom ? Math.max(0, heldZones.length - ctx.p.repUpkeepFrom + 1) : 0;
+          gain -= upkeep;
           if (st.fx === "bleedingRep" && lost.has(pl.id) && !st.zones.some((z) => z.holder === pl.id && st.res[pl.id].lines.some((l) => l.zone === z.i))) gain -= 1;
           pl.tracks.rep = Math.max(0, pl.tracks.rep + gain);
-          if (gain) st.log.push({ r: st.round, k: "rep", pid: pl.id, text: `${pl.name} ${gain > 0 ? "+" : ""}${gain} Rep${st.res[pl.id].six ? " (incl. Thumb 6)" : ""} → ${pl.tracks.rep}` });
+          if (gain) st.log.push({ r: st.round, k: "rep", pid: pl.id, text: `${pl.name} ${gain > 0 ? "+" : ""}${gain} Rep${st.res[pl.id].six ? " (incl. Thumb 6)" : ""}${upkeep ? ` (upkeep −${upkeep})` : ""} → ${pl.tracks.rep}` });
         }
       },
     },
