@@ -1,0 +1,10 @@
+[
+ { "id": "SWAP_MEET",       "name": "Swap Meet",       "type": "blessing", "effect": "swapPass",   "img": "assets/wheel/1_SWAP_MEET.png",       "text": "Before casting, everyone passes 2 cards face down to the left." },
+ { "id": "FLIP_THE_SCRIPT", "name": "Flip the Script", "type": "blessing", "effect": "flipScript", "img": "assets/wheel/2_FLIP_THE_SCRIPT.png", "text": "After the flip, everyone chooses at once: keep your totals, or swap your ATK and BLK." },
+ { "id": "THE_TURF",        "name": "The Turf",        "type": "blessing", "effect": "turf",       "img": "assets/wheel/3_THE_TURF.png",        "text": "Line limit 10, cast up to 4 cards." },
+ { "id": "CLEAN_KIT",       "name": "Clean Kit",       "type": "blessing", "effect": "cleanKit",   "img": "assets/wheel/4_CLEAN_KIT.png",       "text": "A Trigger Thumb roll of 1 counts as nothing." },
+ { "id": "BLEEDING",        "name": "Bleeding",        "type": "curse",    "effect": "bleeding",   "img": "assets/wheel/5_BLEEDING.png",        "text": "Last on ATK takes +1 damage; last on BLK takes +1 damage." },
+ { "id": "CUFFED",          "name": "Cuffed",          "type": "curse",    "effect": "cuffed",     "img": "assets/wheel/6_CUFFED.png",          "text": "Line limit 6." },
+ { "id": "MUGGED",          "name": "Mugged",          "type": "curse",    "effect": "rotateAtk",  "img": "assets/wheel/7_MUGGED.png",          "text": "After ranking, ATK ranks rotate: 1st drops to last, everyone else moves up 1." },
+ { "id": "SABOTAGE",        "name": "Sabotage",        "type": "curse",    "effect": "rotateBlk",  "img": "assets/wheel/8_SABOTAGE.png",        "text": "Same rotation on BLK ranks." }
+]

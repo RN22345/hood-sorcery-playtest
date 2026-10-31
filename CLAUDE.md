@@ -1,0 +1,17 @@
+# Instructions for AI coding sessions (Claude Code cloud, or any agent)
+
+1. Read `DEVLOG.md` in full first (architecture §2, decisions §4, backlog §5, last log entries §6).
+2. Pick one or two backlog items unless the user names a task. Keep changes small and in the existing style:
+   plain ES modules, no build step, no new dependencies unless the DEVLOG says why.
+3. **Rules live only in `engine/`.** No DOM, no network, no `Math.random` there (use `rng.js`; bots use
+   `botRng`). UI and network code must never decide rules.
+4. Before committing: `npm test` must pass and `node tools/simulate.mjs 50` must run without errors.
+   Add a unit test for any rule you add or change.
+5. Rule numbers come from the mode files / SRD v3.10.20 and the pathway docs. If a rule is unclear, choose the
+   simplest reading, flag it in the mode's `modes/<id>.md` under "Playtest guesses", and note it in DEVLOG §4.
+6. At the end, **append** an entry to DEVLOG §6 (date, harness/model, what changed, what's verified, what's open)
+   and tick or move backlog items. Update `README.md` if anything user-visible changed and `ART_TODO.md` if art
+   needs changed.
+7. Never commit secrets. Don't add analytics or trackers.
+8. Lore names: crews Ember Saints (P1 red, fire), Tide Syndicate (P2 blue, water), Stone Crows (P3 green, earth),
+   Gale Runners (P4 purple, wind). "P1–P16" means rework pathways, not players, in design docs.

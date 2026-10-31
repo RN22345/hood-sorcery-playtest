@@ -1,0 +1,13 @@
+{
+ "id": "posted-up",
+ "name": "Posted Up",
+ "pathway": "P15",
+ "blurb": "All of Classic, plus: before casting, pick a Spot (Corner, Tunnel, Lot). Highest ATK at a Spot takes it. The rich Spot heals 1. When the Vein closes, each Spot you hold is -1 damage.",
+ "players": [2, 3, 4],
+ "zones": { "castInto": "chosen", "names": ["Corner", "Tunnel", "Lot"] },
+ "modules": ["matrix", "postedUp"],
+ "params": { "richHeal": 1, "endPayout": 1 },
+ "wheel": {},
+ "win": { "track": "damage", "best": "lowest", "ties": ["lastRound", "lastTotal", "rolloff"] },
+ "rules": "modes/posted-up.md"
+}

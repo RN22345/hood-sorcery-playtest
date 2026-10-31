@@ -1,0 +1,6 @@
+[
+ { "seat": "P1", "name": "Ember Saints",   "color": "#d8453b", "element": "fire",  "img": "assets/crews/P1_fire.png" },
+ { "seat": "P2", "name": "Tide Syndicate", "color": "#3b7fd8", "element": "water", "img": "assets/crews/P2_water.png" },
+ { "seat": "P3", "name": "Stone Crows",    "color": "#3fa45b", "element": "earth", "img": "assets/crews/P3_earth.png" },
+ { "seat": "P4", "name": "Gale Runners",   "color": "#9a52d1", "element": "wind",  "img": "assets/crews/P4_wind.png" }
+]

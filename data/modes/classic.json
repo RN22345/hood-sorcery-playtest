@@ -1,0 +1,13 @@
+{
+ "id": "classic",
+ "name": "Classic",
+ "pathway": "SRD v3.10.20",
+ "blurb": "The printed game. Rank everyone on ATK and BLK, take matrix damage. Least damage wins. The control group for every test.",
+ "players": [2, 3, 4],
+ "zones": { "castInto": "one", "names": ["The Line"] },
+ "modules": ["matrix"],
+ "params": {},
+ "wheel": {},
+ "win": { "track": "damage", "best": "lowest", "ties": ["lastRound", "lastTotal", "rolloff"] },
+ "rules": "modes/classic.md"
+}

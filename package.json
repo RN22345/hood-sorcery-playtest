@@ -1,0 +1,12 @@
+{
+  "name": "hood-sorcery-playtest",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Hood Sorcery multi-mode playtest site. Static, no build step.",
+  "scripts": {
+    "test": "node --test tests/engine.test.js",
+    "sim": "node tools/simulate.mjs 200",
+    "serve": "npx --yes http-server -p 8080 -c-1 ."
+  }
+}

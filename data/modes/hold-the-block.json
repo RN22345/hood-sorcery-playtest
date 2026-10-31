@@ -1,0 +1,13 @@
+{
+ "id": "hold-the-block",
+ "name": "Hold the Block",
+ "pathway": "P2",
+ "blurb": "One Vein corner. The holder heals every round, but the whole Street hits them, and they hit back. Each round: stay or bail? Least damage wins.",
+ "players": [3, 4],
+ "zones": { "castInto": "one", "names": ["The Block"] },
+ "modules": ["holdTheBlock"],
+ "params": { "blockHeal": 2, "kickHits": 3 },
+ "wheel": { "MUGGED": "noHeal", "SABOTAGE": "holderBlkDown" },
+ "win": { "track": "damage", "best": "lowest", "ties": ["lastRound", "lastTotal", "rolloff"] },
+ "rules": "modes/hold-the-block.md"
+}

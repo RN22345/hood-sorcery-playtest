@@ -1,0 +1,13 @@
+{
+ "id": "corners",
+ "name": "Corners",
+ "pathway": "P1",
+ "blurb": "Split your 8 fingers across 3 street corners. Challengers count ATK, the holder defends with BLK. Every corner you hold pays 1 Rep. Most Rep wins.",
+ "players": [2, 3, 4],
+ "zones": { "castInto": "any", "names": ["Corner A", "Corner B", "Corner C", "Corner D"] },
+ "modules": ["corners"],
+ "params": { "zoneCount": 3, "repPerCorner": 1 },
+ "wheel": { "THE_TURF": "extraZone", "MUGGED": "muggedCorner", "SABOTAGE": "challengerTies", "BLEEDING": "bleedingRep" },
+ "win": { "track": "rep", "best": "highest", "ties": ["zones", "lastRound", "rolloff"] },
+ "rules": "modes/corners.md"
+}

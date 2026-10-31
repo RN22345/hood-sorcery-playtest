@@ -1,0 +1,13 @@
+{
+ "_note": "Rows = ATK rank (1st first), columns = BLK rank. Cell = damage taken. standard = SRD v3.10.20 §5 (2/3-player rows from tools/balance_sim/sim.py). specialist = Change Ladder L0.4: 1st on either stat takes 0.",
+ "standard": {
+  "2": [[0,1],[1,2]],
+  "3": [[0,0,1],[0,1,1],[1,1,2]],
+  "4": [[0,0,0,1],[0,0,1,1],[0,1,1,2],[1,1,2,2]]
+ },
+ "specialist": {
+  "2": [[0,0],[0,2]],
+  "3": [[0,0,0],[0,1,1],[0,1,2]],
+  "4": [[0,0,0,0],[0,0,1,1],[0,1,1,2],[0,1,2,2]]
+ }
+}

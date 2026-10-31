@@ -1,0 +1,18 @@
+[
+ { "id": "call-out", "name": "Call Out (P16)", "desc": "Before the flip, spend a ready Thumb to call out a rival: your ATK beats their BLK, they take +1; otherwise you take +1. With Posted Up: only crews at your Spot.",
+   "modules": ["callOut"], "params": {}, "requires": { "track": "damage" } },
+ { "id": "pass-the-tab", "name": "Pass the Tab (P12)", "desc": "The crew with the biggest damage this round may pay a Thumb to swap it with the next-worst crew, who may pass it on. 3 Thumbs each.",
+   "modules": ["passTheTab"], "params": { "thumbs": 3 }, "requires": { "modules": ["matrix"] } },
+ { "id": "specialist", "name": "Specialist matrix", "desc": "1st on either ATK or BLK takes 0 damage (Change Ladder L0.4).",
+   "modules": [], "params": { "matrixSet": "specialist" }, "requires": { "modules": ["matrix"] } },
+ { "id": "forecast", "name": "Forecast", "desc": "From round 4, the Vein announces next round's rich Spot one round early.",
+   "modules": ["forecast"], "params": { "forecastFrom": 4 }, "requires": { "modules": ["postedUp"] } },
+ { "id": "four-corners", "name": "4 corners", "desc": "Play Corners with 4 corners instead of 3.",
+   "modules": [], "params": { "zoneCount": 4 }, "requires": { "modules": ["corners"] } },
+ { "id": "block-heal-1", "name": "Block heals 1", "desc": "The Block heals 1 instead of 2.",
+   "modules": [], "params": { "blockHeal": 1 }, "requires": { "modules": ["holdTheBlock"] } },
+ { "id": "three-thumbs", "name": "3 Trigger Thumbs", "desc": "Everyone starts with 3 Thumbs instead of 2.",
+   "modules": [], "params": { "thumbs": 3 } },
+ { "id": "short-game", "name": "Short game (4 rounds)", "desc": "4 rounds instead of 8, for quick rules checks.",
+   "modules": [], "params": { "rounds": 4 } }
+]

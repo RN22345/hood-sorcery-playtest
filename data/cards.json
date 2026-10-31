@@ -1,0 +1,722 @@
+[
+ {
+  "id": "HS3-P01",
+  "name": "Brick Toss",
+  "start": "earth",
+  "end": "earth",
+  "len": 2,
+  "atk": 3,
+  "blk": 0,
+  "img": "assets/cards/HS3-P01.webp"
+ },
+ {
+  "id": "HS3-P02",
+  "name": "Lighter Fluid",
+  "start": "fire",
+  "end": "fire",
+  "len": 2,
+  "atk": 3,
+  "blk": 0,
+  "img": "assets/cards/HS3-P02.webp"
+ },
+ {
+  "id": "HS3-P03",
+  "name": "Cherry Bomb",
+  "start": "fire",
+  "end": "wind",
+  "len": 2,
+  "atk": 3,
+  "blk": 0,
+  "img": "assets/cards/HS3-P03.webp"
+ },
+ {
+  "id": "HS3-P04",
+  "name": "Mud Slap",
+  "start": "water",
+  "end": "earth",
+  "len": 2,
+  "atk": 3,
+  "blk": 0,
+  "img": "assets/cards/HS3-P04.webp"
+ },
+ {
+  "id": "HS3-P05",
+  "name": "Fanned Flame",
+  "start": "wind",
+  "end": "fire",
+  "len": 2,
+  "atk": 3,
+  "blk": 0,
+  "img": "assets/cards/HS3-P05.webp"
+ },
+ {
+  "id": "HS3-P06",
+  "name": "Sucker Gust",
+  "start": "wind",
+  "end": "wind",
+  "len": 2,
+  "atk": 3,
+  "blk": 0,
+  "img": "assets/cards/HS3-P06.webp"
+ },
+ {
+  "id": "HS3-P07",
+  "name": "Hot Coals",
+  "start": "earth",
+  "end": "fire",
+  "len": 2,
+  "atk": 2,
+  "blk": 1,
+  "img": "assets/cards/HS3-P07.webp"
+ },
+ {
+  "id": "HS3-P08",
+  "name": "Matchstick",
+  "start": "fire",
+  "end": "fire",
+  "len": 2,
+  "atk": 2,
+  "blk": 1,
+  "img": "assets/cards/HS3-P08.webp"
+ },
+ {
+  "id": "HS3-P09",
+  "name": "Sparkler",
+  "start": "fire",
+  "end": "wind",
+  "len": 2,
+  "atk": 2,
+  "blk": 1,
+  "img": "assets/cards/HS3-P09.webp"
+ },
+ {
+  "id": "HS3-P10",
+  "name": "Squall",
+  "start": "water",
+  "end": "wind",
+  "len": 2,
+  "atk": 2,
+  "blk": 1,
+  "img": "assets/cards/HS3-P10.webp"
+ },
+ {
+  "id": "HS3-P11",
+  "name": "Blowtorch",
+  "start": "wind",
+  "end": "fire",
+  "len": 2,
+  "atk": 2,
+  "blk": 1,
+  "img": "assets/cards/HS3-P11.webp"
+ },
+ {
+  "id": "HS3-P12",
+  "name": "Cross Breeze",
+  "start": "wind",
+  "end": "wind",
+  "len": 2,
+  "atk": 2,
+  "blk": 1,
+  "img": "assets/cards/HS3-P12.webp"
+ },
+ {
+  "id": "HS3-P13",
+  "name": "Mud Puddle",
+  "start": "earth",
+  "end": "water",
+  "len": 2,
+  "atk": 1,
+  "blk": 2,
+  "img": "assets/cards/HS3-P13.webp"
+ },
+ {
+  "id": "HS3-P14",
+  "name": "Ash Pile",
+  "start": "fire",
+  "end": "earth",
+  "len": 2,
+  "atk": 1,
+  "blk": 2,
+  "img": "assets/cards/HS3-P14.webp"
+ },
+ {
+  "id": "HS3-P15",
+  "name": "Radiator",
+  "start": "fire",
+  "end": "water",
+  "len": 2,
+  "atk": 1,
+  "blk": 2,
+  "img": "assets/cards/HS3-P15.webp"
+ },
+ {
+  "id": "HS3-P16",
+  "name": "Hot Shower",
+  "start": "water",
+  "end": "fire",
+  "len": 2,
+  "atk": 1,
+  "blk": 2,
+  "img": "assets/cards/HS3-P16.webp"
+ },
+ {
+  "id": "HS3-P17",
+  "name": "Water Balloon",
+  "start": "water",
+  "end": "water",
+  "len": 2,
+  "atk": 1,
+  "blk": 2,
+  "img": "assets/cards/HS3-P17.webp"
+ },
+ {
+  "id": "HS3-P18",
+  "name": "Drizzle",
+  "start": "wind",
+  "end": "water",
+  "len": 2,
+  "atk": 1,
+  "blk": 2,
+  "img": "assets/cards/HS3-P18.webp"
+ },
+ {
+  "id": "HS3-P19",
+  "name": "Cinderblock",
+  "start": "earth",
+  "end": "earth",
+  "len": 2,
+  "atk": 0,
+  "blk": 3,
+  "img": "assets/cards/HS3-P19.webp"
+ },
+ {
+  "id": "HS3-P20",
+  "name": "Gutter",
+  "start": "earth",
+  "end": "water",
+  "len": 2,
+  "atk": 0,
+  "blk": 3,
+  "img": "assets/cards/HS3-P20.webp"
+ },
+ {
+  "id": "HS3-P21",
+  "name": "Dust Cloud",
+  "start": "earth",
+  "end": "wind",
+  "len": 2,
+  "atk": 0,
+  "blk": 3,
+  "img": "assets/cards/HS3-P21.webp"
+ },
+ {
+  "id": "HS3-P22",
+  "name": "Sandbag",
+  "start": "water",
+  "end": "earth",
+  "len": 2,
+  "atk": 0,
+  "blk": 3,
+  "img": "assets/cards/HS3-P22.webp"
+ },
+ {
+  "id": "HS3-P23",
+  "name": "Fire Hydrant",
+  "start": "water",
+  "end": "water",
+  "len": 2,
+  "atk": 0,
+  "blk": 3,
+  "img": "assets/cards/HS3-P23.webp"
+ },
+ {
+  "id": "HS3-P24",
+  "name": "Dust Devil",
+  "start": "wind",
+  "end": "earth",
+  "len": 2,
+  "atk": 0,
+  "blk": 3,
+  "img": "assets/cards/HS3-P24.webp"
+ },
+ {
+  "id": "HS3-P25",
+  "name": "Flash Flood",
+  "start": "water",
+  "end": "earth",
+  "len": 3,
+  "atk": 4,
+  "blk": 0,
+  "img": "assets/cards/HS3-P25.webp"
+ },
+ {
+  "id": "HS3-P26",
+  "name": "Dust Storm",
+  "start": "wind",
+  "end": "earth",
+  "len": 3,
+  "atk": 4,
+  "blk": 0,
+  "img": "assets/cards/HS3-P26.webp"
+ },
+ {
+  "id": "HS3-P27",
+  "name": "Flamethrower",
+  "start": "wind",
+  "end": "fire",
+  "len": 3,
+  "atk": 4,
+  "blk": 0,
+  "img": "assets/cards/HS3-P27.webp"
+ },
+ {
+  "id": "HS3-P28",
+  "name": "Rockslide",
+  "start": "earth",
+  "end": "wind",
+  "len": 3,
+  "atk": 3,
+  "blk": 1,
+  "img": "assets/cards/HS3-P28.webp"
+ },
+ {
+  "id": "HS3-P29",
+  "name": "Molotov",
+  "start": "fire",
+  "end": "fire",
+  "len": 3,
+  "atk": 3,
+  "blk": 1,
+  "img": "assets/cards/HS3-P29.webp"
+ },
+ {
+  "id": "HS3-P30",
+  "name": "Backdraft",
+  "start": "fire",
+  "end": "wind",
+  "len": 3,
+  "atk": 3,
+  "blk": 1,
+  "img": "assets/cards/HS3-P30.webp"
+ },
+ {
+  "id": "HS3-P31",
+  "name": "Riptide",
+  "start": "water",
+  "end": "earth",
+  "len": 3,
+  "atk": 3,
+  "blk": 1,
+  "img": "assets/cards/HS3-P31.webp"
+ },
+ {
+  "id": "HS3-P32",
+  "name": "Squall Line",
+  "start": "wind",
+  "end": "water",
+  "len": 3,
+  "atk": 3,
+  "blk": 1,
+  "img": "assets/cards/HS3-P32.webp"
+ },
+ {
+  "id": "HS3-P33",
+  "name": "Tailwind",
+  "start": "wind",
+  "end": "wind",
+  "len": 3,
+  "atk": 3,
+  "blk": 1,
+  "img": "assets/cards/HS3-P33.webp"
+ },
+ {
+  "id": "HS3-P34",
+  "name": "Bottle Rocket",
+  "start": "earth",
+  "end": "water",
+  "len": 3,
+  "atk": 2,
+  "blk": 2,
+  "img": "assets/cards/HS3-P34.webp"
+ },
+ {
+  "id": "HS3-P35",
+  "name": "Brushfire",
+  "start": "fire",
+  "end": "earth",
+  "len": 3,
+  "atk": 2,
+  "blk": 2,
+  "img": "assets/cards/HS3-P35.webp"
+ },
+ {
+  "id": "HS3-P36",
+  "name": "Bonfire",
+  "start": "fire",
+  "end": "fire",
+  "len": 3,
+  "atk": 2,
+  "blk": 2,
+  "img": "assets/cards/HS3-P36.webp"
+ },
+ {
+  "id": "HS3-P37",
+  "name": "Scorched Turf",
+  "start": "fire",
+  "end": "wind",
+  "len": 3,
+  "atk": 2,
+  "blk": 2,
+  "img": "assets/cards/HS3-P37.webp"
+ },
+ {
+  "id": "HS3-P38",
+  "name": "Pressure Cooker",
+  "start": "water",
+  "end": "fire",
+  "len": 3,
+  "atk": 2,
+  "blk": 2,
+  "img": "assets/cards/HS3-P38.webp"
+ },
+ {
+  "id": "HS3-P39",
+  "name": "Sprinkler",
+  "start": "water",
+  "end": "wind",
+  "len": 3,
+  "atk": 2,
+  "blk": 2,
+  "img": "assets/cards/HS3-P39.webp"
+ },
+ {
+  "id": "HS3-P40",
+  "name": "Rubble",
+  "start": "earth",
+  "end": "earth",
+  "len": 3,
+  "atk": 1,
+  "blk": 3,
+  "img": "assets/cards/HS3-P40.webp"
+ },
+ {
+  "id": "HS3-P41",
+  "name": "Levee",
+  "start": "earth",
+  "end": "water",
+  "len": 3,
+  "atk": 1,
+  "blk": 3,
+  "img": "assets/cards/HS3-P41.webp"
+ },
+ {
+  "id": "HS3-P42",
+  "name": "Steam Vent",
+  "start": "fire",
+  "end": "water",
+  "len": 3,
+  "atk": 1,
+  "blk": 3,
+  "img": "assets/cards/HS3-P42.webp"
+ },
+ {
+  "id": "HS3-P43",
+  "name": "Undertow",
+  "start": "water",
+  "end": "water",
+  "len": 3,
+  "atk": 1,
+  "blk": 3,
+  "img": "assets/cards/HS3-P43.webp"
+ },
+ {
+  "id": "HS3-P44",
+  "name": "Smoke Screen",
+  "start": "wind",
+  "end": "fire",
+  "len": 3,
+  "atk": 1,
+  "blk": 3,
+  "img": "assets/cards/HS3-P44.webp"
+ },
+ {
+  "id": "HS3-P45",
+  "name": "Windbreak",
+  "start": "wind",
+  "end": "wind",
+  "len": 3,
+  "atk": 1,
+  "blk": 3,
+  "img": "assets/cards/HS3-P45.webp"
+ },
+ {
+  "id": "HS3-P46",
+  "name": "Bunker",
+  "start": "earth",
+  "end": "earth",
+  "len": 3,
+  "atk": 0,
+  "blk": 4,
+  "img": "assets/cards/HS3-P46.webp"
+ },
+ {
+  "id": "HS3-P47",
+  "name": "Kiln",
+  "start": "earth",
+  "end": "fire",
+  "len": 3,
+  "atk": 0,
+  "blk": 4,
+  "img": "assets/cards/HS3-P47.webp"
+ },
+ {
+  "id": "HS3-P48",
+  "name": "Seawall",
+  "start": "water",
+  "end": "water",
+  "len": 3,
+  "atk": 0,
+  "blk": 4,
+  "img": "assets/cards/HS3-P48.webp"
+ },
+ {
+  "id": "HS3-P49",
+  "name": "Maelstrom",
+  "start": "water",
+  "end": "wind",
+  "len": 4,
+  "atk": 5,
+  "blk": 0,
+  "img": "assets/cards/HS3-P49.webp"
+ },
+ {
+  "id": "HS3-P50",
+  "name": "Mudslide",
+  "start": "earth",
+  "end": "water",
+  "len": 4,
+  "atk": 4,
+  "blk": 1,
+  "img": "assets/cards/HS3-P50.webp"
+ },
+ {
+  "id": "HS3-P51",
+  "name": "Tidal Wave",
+  "start": "water",
+  "end": "water",
+  "len": 4,
+  "atk": 4,
+  "blk": 1,
+  "img": "assets/cards/HS3-P51.webp"
+ },
+ {
+  "id": "HS3-P52",
+  "name": "Firestorm",
+  "start": "wind",
+  "end": "fire",
+  "len": 4,
+  "atk": 4,
+  "blk": 1,
+  "img": "assets/cards/HS3-P52.webp"
+ },
+ {
+  "id": "HS3-P53",
+  "name": "Hurricane",
+  "start": "wind",
+  "end": "water",
+  "len": 4,
+  "atk": 4,
+  "blk": 1,
+  "img": "assets/cards/HS3-P53.webp"
+ },
+ {
+  "id": "HS3-P54",
+  "name": "Tornado Alley",
+  "start": "wind",
+  "end": "wind",
+  "len": 4,
+  "atk": 4,
+  "blk": 1,
+  "img": "assets/cards/HS3-P54.webp"
+ },
+ {
+  "id": "HS3-P55",
+  "name": "Lava Flow",
+  "start": "earth",
+  "end": "fire",
+  "len": 4,
+  "atk": 3,
+  "blk": 2,
+  "img": "assets/cards/HS3-P55.webp"
+ },
+ {
+  "id": "HS3-P56",
+  "name": "Inferno",
+  "start": "fire",
+  "end": "fire",
+  "len": 4,
+  "atk": 3,
+  "blk": 2,
+  "img": "assets/cards/HS3-P56.webp"
+ },
+ {
+  "id": "HS3-P57",
+  "name": "Boiling Point",
+  "start": "fire",
+  "end": "wind",
+  "len": 4,
+  "atk": 3,
+  "blk": 2,
+  "img": "assets/cards/HS3-P57.webp"
+ },
+ {
+  "id": "HS3-P58",
+  "name": "Monsoon",
+  "start": "water",
+  "end": "earth",
+  "len": 4,
+  "atk": 3,
+  "blk": 2,
+  "img": "assets/cards/HS3-P58.webp"
+ },
+ {
+  "id": "HS3-P59",
+  "name": "Four Corners",
+  "start": "water",
+  "end": "fire",
+  "len": 4,
+  "atk": 3,
+  "blk": 2,
+  "img": "assets/cards/HS3-P59.webp"
+ },
+ {
+  "id": "HS3-P60",
+  "name": "Ember Gale",
+  "start": "wind",
+  "end": "fire",
+  "len": 4,
+  "atk": 3,
+  "blk": 2,
+  "img": "assets/cards/HS3-P60.webp"
+ },
+ {
+  "id": "HS3-P61",
+  "name": "Landslide",
+  "start": "earth",
+  "end": "earth",
+  "len": 4,
+  "atk": 2,
+  "blk": 3,
+  "img": "assets/cards/HS3-P61.webp"
+ },
+ {
+  "id": "HS3-P62",
+  "name": "Fault Line",
+  "start": "earth",
+  "end": "wind",
+  "len": 4,
+  "atk": 2,
+  "blk": 3,
+  "img": "assets/cards/HS3-P62.webp"
+ },
+ {
+  "id": "HS3-P63",
+  "name": "Arc Welder",
+  "start": "fire",
+  "end": "water",
+  "len": 4,
+  "atk": 2,
+  "blk": 3,
+  "img": "assets/cards/HS3-P63.webp"
+ },
+ {
+  "id": "HS3-P64",
+  "name": "Heat Wave",
+  "start": "fire",
+  "end": "wind",
+  "len": 4,
+  "atk": 2,
+  "blk": 3,
+  "img": "assets/cards/HS3-P64.webp"
+ },
+ {
+  "id": "HS3-P65",
+  "name": "Turbine",
+  "start": "wind",
+  "end": "earth",
+  "len": 4,
+  "atk": 2,
+  "blk": 3,
+  "img": "assets/cards/HS3-P65.webp"
+ },
+ {
+  "id": "HS3-P66",
+  "name": "Cyclone",
+  "start": "wind",
+  "end": "wind",
+  "len": 4,
+  "atk": 2,
+  "blk": 3,
+  "img": "assets/cards/HS3-P66.webp"
+ },
+ {
+  "id": "HS3-P67",
+  "name": "Stonewall",
+  "start": "earth",
+  "end": "earth",
+  "len": 4,
+  "atk": 1,
+  "blk": 4,
+  "img": "assets/cards/HS3-P67.webp"
+ },
+ {
+  "id": "HS3-P68",
+  "name": "Breakwater",
+  "start": "earth",
+  "end": "water",
+  "len": 4,
+  "atk": 1,
+  "blk": 4,
+  "img": "assets/cards/HS3-P68.webp"
+ },
+ {
+  "id": "HS3-P69",
+  "name": "Landfill Fire",
+  "start": "fire",
+  "end": "fire",
+  "len": 4,
+  "atk": 1,
+  "blk": 4,
+  "img": "assets/cards/HS3-P69.webp"
+ },
+ {
+  "id": "HS3-P70",
+  "name": "Storm Drain",
+  "start": "water",
+  "end": "earth",
+  "len": 4,
+  "atk": 1,
+  "blk": 4,
+  "img": "assets/cards/HS3-P70.webp"
+ },
+ {
+  "id": "HS3-P71",
+  "name": "Floodgate",
+  "start": "water",
+  "end": "water",
+  "len": 4,
+  "atk": 1,
+  "blk": 4,
+  "img": "assets/cards/HS3-P71.webp"
+ },
+ {
+  "id": "HS3-P72",
+  "name": "Firewall",
+  "start": "fire",
+  "end": "earth",
+  "len": 4,
+  "atk": 0,
+  "blk": 5,
+  "img": "assets/cards/HS3-P72.webp"
+ }
+]
