@@ -8,9 +8,12 @@ export function buildBeats(entries, v, pace = "each") {
   const name = (pid) => v.players[pid]?.name;
   const zoneIn = (text) => v.zones.filter((z) => text.includes(z.name)).map((z) => z.name);
   const pidsIn = (text) => v.players.filter((p) => text.includes(p.name)).map((p) => p.id);
+  let resolved = false; // a round has been resolved in this batch: hold on its results before the next round starts
+  const hold = () => { if (resolved) beats.push({ type: "hold", caption: "", dur: 3000 }); resolved = false; };
   for (let i = 0; i < entries.length; i++) {
     const e = entries[i];
     if (QUIET.has(e.k)) continue;
+    if (e.k === "round" || e.k === "end") hold();
     if (e.k === "round") { beats.push({ type: "round", round: e.r, caption: e.text, dur: 1000 }); continue; }
     if (e.k === "wheel") { beats.push({ type: "wheel", id: e.id, caption: e.text, dur: 2700 }); continue; }
     if (e.k === "cast") { beats.push({ type: "say", caption: "All lines are in. Flip them!", dur: 700, sfx: "lock" }); continue; }
@@ -21,16 +24,18 @@ export function buildBeats(entries, v, pace = "each") {
       const rolled = group.filter((x) => (resFor(v, e.r)?.[x.pid]?.rolls || []).length);
       if (pace === "together" && rolled.length) beats.push({ type: "dice", round: e.r, pids: rolled.map((x) => x.pid), caption: "Trigger Thumbs!", dur: 1500 });
       else for (const x of rolled) beats.push({ type: "dice", round: e.r, pids: [x.pid], caption: `${name(x.pid)} rolls Thumbs`, dur: 1300 });
-      beats.push({ type: "totals", round: e.r, pids: group.map((x) => x.pid), caption: group.map((x) => x.text.split(",")[0]).join(" · "), dur: 1500 });
+      beats.push({ type: "totals", round: e.r, pids: group.map((x) => x.pid), caption: "Totals are in", dur: 1100 });
       continue;
     }
-    if (e.k === "rank" && e.ranks) { beats.push({ type: "rank", ranks: e.ranks, caption: e.text, pids: e.ranks.atk, dur: 2200 }); continue; }
+    if (e.k === "rank" && e.ranks) { resolved = true; beats.push({ type: "rank", ranks: e.ranks, caption: e.text, pids: e.ranks.atk, dur: 2000 }); continue; }
     if (e.zone && "holder" in e) {
+      resolved = true;
       beats.push({ type: "claim", zone: e.zone, holder: e.holder, caption: e.text, pids: e.pids || (e.holder != null ? [e.holder] : []), zones: [e.zone], dur: 1500 });
       continue;
     }
     const deltas = e.ds ? Object.entries(e.ds).map(([pid, d]) => ({ pid: +pid, d })) : e.d != null && e.pid != null ? [{ pid: e.pid, d: e.d }] : [];
     if (deltas.length) {
+      resolved = true;
       const b = { type: "score", k: e.k, deltas, caption: e.text, pids: deltas.map((x) => x.pid), zones: e.zone ? [e.zone] : zoneIn(e.text), dur: 1150 };
       const prev = beats[beats.length - 1];
       if (pace === "together" && prev?.type === "score" && prev.k === e.k) { prev.deltas.push(...deltas); prev.pids.push(...b.pids); prev.caption += " · " + e.text; }

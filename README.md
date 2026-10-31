@@ -18,7 +18,9 @@ Corner locations (P1) · Block corner (P1+P2) · Open first card (P1) · Rep upk
 Short game (4 rounds).
 
 Built for a desktop browser at any size from 480p to 4K: the whole table always fits the window, with no
-scrolling. On a phone it switches to a scrolling layout. 🔊 mutes, ⚙ opens the settings. Music and sound
+scrolling (the crews are a slim scoreboard on the left; the line, the lanes of cast cards and your hand get the
+rest). In **Hold the Block** the holder sits in a gold 👑 *Holder* pane apart from *The Street*, and the cast
+panel says which side you are on. On a phone it switches to a scrolling layout. 🔊 mutes, ⚙ opens the settings. Music and sound
 effects are CC0 (credits in `assets/audio/CREDITS.md` and on the title screen).
 
 ---
@@ -36,8 +38,11 @@ effects are CC0 (credits in `assets/audio/CREDITS.md` and on the title screen).
    Trigger Thumbs; **Cast** lights up when the line is legal.
 4. **Then the table plays it out:** the cards flip, Trigger Thumb dice roll, totals and rank badges appear, each
    corner/Spot changes hands with a flash, and damage or Rep floats up from each crew while the counters move. A
-   caption says what happened. **Skip** or change the speed at any time (Settings: slow / normal / fast /
-   instant; one crew at a time or all at once). The next round opens with the Wheel spinning.
+   caption says what happened. When the round resolves, a **Round results** pop-up shows every crew's totals and
+   rank and, in Classic and Posted Up, the printed **Damage Matrix** with each crew's token on its cell. It
+   closes by itself (or click it, or press Enter; *Results* in the strip under the table reopens it; Settings:
+   closes itself / wait for a click / off). **Skip** or change the speed at any time (Settings: slow / normal /
+   fast / instant; one crew at a time or all at once). The next round opens with the Wheel spinning.
 5. **Online:** *Play online* → **Host a table** (set seats to Online, open the room, share the **code** or the
    invite link) or **Join a table** (name + code). During the game a strip shows who is connected; a dropped
    player presses **Reconnect** and gets their seat back, and the host can let a **bot take over** meanwhile.

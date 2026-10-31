@@ -10,6 +10,7 @@ import { banner, wheelReel, floatText, flash, dice, sound } from "./fx.js";
 import { buildBeats, resFor } from "./beats.js";
 
 const SPEED = { slow: 1.5, normal: 1, fast: 0.5 };
+const RESOLVING = new Set(["rank", "claim", "score"]);
 
 /**
  * Runs beats one after another. hooks: { view(), render(), data, speed(): "slow"|"normal"|"fast"|"instant",
@@ -18,8 +19,8 @@ const SPEED = { slow: 1.5, normal: 1, fast: 0.5 };
 export class Presenter {
   constructor(hooks) { this.h = hooks; this.reset(); }
   reset(v = null) {
-    clearTimeout(this.timer);
-    this.queue = []; this.cur = null; this.busy = false; this.fresh = false;
+    clearTimeout(this.timer); clearTimeout(this.resTimer);
+    this.queue = []; this.cur = null; this.busy = false; this.fresh = false; this.res = null; this.seq = 0; this.totalsRound = 0; this.resShown = 0;
     this.pos = v ? v.log.length : 0;
     this.disp = null;
     if (v) this.sync(v);
@@ -49,11 +50,37 @@ export class Presenter {
   }
   skip() {
     clearTimeout(this.timer);
+    let tr = this.totalsRound, open = 0;
+    for (const b of [this.cur, ...this.queue]) {
+      if (b?.type === "totals") tr = b.round;
+      if (RESOLVING.has(b?.type) && tr && tr !== this.resShown) { this.resShown = open = tr; }
+    }
+    if (open) this.openResults(open);
     this.queue = []; this.cur = null; this.busy = false;
     const v = this.h.view();
     if (v) this.sync(v);
+    this.armResults();
     this.h.render();
     this.h.onIdle();
+  }
+  /** The round-results popup: opens when the round starts to resolve, stays through the rest of the round, then closes
+   *  by itself (setting "auto"), on a click ("click"), or never opens ("off"). */
+  openResults(round) {
+    clearTimeout(this.resTimer);
+    this.res = (this.h.results?.() ?? "auto") === "off" ? null : { round };
+  }
+  armResults() {
+    clearTimeout(this.resTimer);
+    if (!this.res || (this.h.results?.() ?? "auto") !== "auto") return;
+    const ms = { slow: 7000, normal: 5000, fast: 3200 }[this.h.speed()] ?? 5000;
+    this.resTimer = setTimeout(() => this.closeResults(), ms);
+  }
+  closeResults() {
+    clearTimeout(this.resTimer);
+    if (!this.res) return;
+    this.res = null;
+    if (this.cur?.type === "hold") { clearTimeout(this.timer); this.next(); return; }
+    this.h.render();
   }
   next() {
     const b = this.queue.shift();
@@ -61,21 +88,30 @@ export class Presenter {
       this.busy = false; this.cur = null;
       const v = this.h.view();
       if (v) this.sync(v);
+      this.armResults();
       this.h.render();
       this.h.onIdle();
       return;
     }
-    this.busy = true; this.cur = b; this.fresh = true;
+    this.busy = true; this.cur = b; this.fresh = true; this.seq++;
     this.apply(b);
     this.h.render();
     this.fresh = false;
     this.effects(b);
     const k = SPEED[this.h.speed()] ?? 1;
+    if (b.type === "hold") { // keep the results pop-up up before the next round starts
+      if (!this.res) { this.timer = setTimeout(() => this.next(), 0); return; }
+      if ((this.h.results?.() ?? "auto") === "click") return; // waits for closeResults()
+    }
     this.timer = setTimeout(() => this.next(), b.type === "wheel" ? Math.max(2300, b.dur * k) : b.dur * k); // the reel needs its time
   }
   apply(b) {
     const d = this.disp;
-    if (b.type === "round") { d.round = b.round; d.ranks = null; }
+    if (b.type === "round") { d.round = b.round; d.ranks = null; clearTimeout(this.resTimer); this.res = null; }
+    if (b.type === "totals") this.totalsRound = b.round;
+    // the results pop-up opens when the round starts to resolve (rank / claim / damage), not at the flip: a choice
+    // like Flip the Script can still come before it
+    if (RESOLVING.has(b.type) && this.totalsRound && this.totalsRound !== this.resShown) { this.resShown = this.totalsRound; this.openResults(this.totalsRound); }
     if (b.type === "reveal") d.shownRound = b.round;
     if (b.type === "rank") d.ranks = b.ranks;
     if (b.type === "claim") d.holders[b.zone] = b.holder;

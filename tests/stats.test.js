@@ -144,6 +144,27 @@ test("narrator beats: fed view by view, score beats end on every final score and
     }
     assert.deepEqual(score, st.players.map((p) => p.tracks[track]), modeId);
     for (const z of st.zones) if (z.name in holders) assert.equal(holders[z.name], z.holder, `${modeId} ${z.name}`);
-    for (const k of ["round", "wheel", "reveal", "totals", "end"]) assert.ok(kinds.has(k), `${modeId} has ${k} beats`);
+    for (const k of ["round", "wheel", "reveal", "totals", "end", "hold"]) assert.ok(kinds.has(k), `${modeId} has ${k} beats`);
+  }
+});
+
+test("round results pop-up: the rank log entry carries the matrix, and every resolved round is followed by a hold beat", async () => {
+  const { buildBeats } = await import("../ui/beats.js");
+  for (const [mods, stake] of [[[], 1], [["specialist"], 1]]) {
+    const st = playOut({ mode: modes.classic, modifiers: mods.map((id) => modifiers[id]), seats: bots(4), seed: "matrix-log" }, data);
+    const ranks = st.log.filter((e) => e.k === "rank");
+    assert.equal(ranks.length, st.mode.params.rounds);
+    for (const e of ranks) {
+      assert.equal(e.m.length, 4);
+      assert.equal(e.stake, stake);
+      // the logged matrix is the one the damage came from: the best crew on both stats takes the 0-0 cell
+      const first = e.ranks.atk[0];
+      assert.equal(e.m[0][e.ranks.blk.indexOf(first)] >= 0, true);
+    }
+    const v = viewFor(st, data, 0);
+    const beats = buildBeats(v.log, v, "each");
+    const types = beats.map((b) => b.type);
+    // a hold sits between the last resolving beat of each round and the next round (or the end banner)
+    for (let i = 1; i < types.length; i++) if (types[i] === "round" || types[i] === "end") assert.equal(types[i - 1], "hold", `before beat ${i}`);
   }
 });

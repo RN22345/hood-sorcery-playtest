@@ -21,7 +21,7 @@ What the site uses today, and what is a placeholder. Source art lives in the Hoo
 | **Corners (P1)** corner tiles | `assets/ui/zone_corner.svg` (flat SVG, one for all corners) | 3–4 painted street corner tiles in the card-art style | ~600×300 |
 | **Corners** location cards (Laundromat, Rooftop, Bodega, Precinct, Subway Grate, Old Church…) | SVG icons `assets/locations/*.svg` + text strip (6 in the game) | ~12 painted location cards with an element lean | card size, or a 600×120 strip |
 | **Run It Up (P4)** | Fold / Call / Raise text buttons, red "Stakes ×N" box | chip/stake tokens | 64×64 |
-| Sounds / music | **CC0 packs in use** (Kenney Casino/Impact/Interface/Jingles, Organic Wooshes, Open Lo-Fi; `assets/audio/CREDITS.md`) | an original Hood Sorcery theme + signature stingers (Wheel, Vein, win) | mp3/ogg |
+| Sounds / music | **CC0 packs in use** (the lo-fi music is a stand-in: it doesn't say hood / sorcery / gangs; wanted: a darker boom-bap / street-noir theme with an occult hook, plus a tenser loop for the last rounds) (Kenney Casino/Impact/Interface/Jingles, Organic Wooshes, Open Lo-Fi; `assets/audio/CREDITS.md`) | an original Hood Sorcery theme + signature stingers (Wheel, Vein, win) | mp3/ogg |
 | **Corners** claim marker | coloured name chip | marker per crew colour (4) | 64×64 |
 | **Hold the Block (P2)** Block tile | `assets/ui/zone_block.svg` (flat SVG) | painted Block / Vein corner tile | ~600×300 |
 | **Posted Up (P15)** Spot tiles | `zone_corner/tunnel/lot.svg` (flat SVG) | 3 painted Spot tiles | ~600×300 |
