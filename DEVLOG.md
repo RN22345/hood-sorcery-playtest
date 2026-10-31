@@ -35,7 +35,11 @@ The printed rules authority is **SRD v3.10.20**; the modes here are playtest var
   - `registry.js`: module table, `resolveMode(mode, modifiers, players)`, `stepsFor(config)`, phase order.
   - `line.js` (seams, finger budget, line enumeration), `rank.js` (SRD §5 ties and roll-offs),
     `cast.js` (allowed zones, cast validation, bot helpers), `rng.js`, `summary.js` (one-line round summary
-    from `players[].hist`; reads only, decides nothing).
+    from `players[].hist`; reads only, decides nothing). `setSeatKind` (game.js) hands a seat to a bot and back.
+- **Stats** (`ui/stats.js`, no DOM, tested in Node): `Timer` (round starts and decision times, observed from
+  successive views, so it works for local, host and client alike), `computeStats(record)` (record = the
+  downloaded game log, v2), `statsMarkdown` / `statsCsv` / `parseStatsFile`. `ui/statsView.js` draws one SVG
+  stats card, shown in the page and exported to PNG/JPEG through a canvas.
   - `modules/*.js`: one rule module each.
 - **Round = fixed phases**: `ROUND_START, PRE_CAST, CAST, PRE_REVEAL, REVEAL, RESOLVE, POST_RESOLVE, REFILL,
   ROUND_END`. Each module contributes **steps** `{ id, phase, order, kind: 'auto'|'choice', when, run | who,
@@ -108,6 +112,17 @@ in `registry.js` (`rounds 8, hand 8, thumbs 2, line 8, maxCards 3`).
 - The reveal moment is UI-only: the engine usually runs straight from the flip to the next round's cast, so
   the UI notices "a new round's lines became visible" (`v.revealed`, or `v.lastRes` one round later), flips
   them once and keeps the highlights for 6 s. No engine pause, so bots and online play are not slowed.
+- **Replacing a dropped player with a bot** is `setSeatKind`, not a recorded action: bots never touch the game
+  rng, so `replay(setup, actions)` still gives the same game. It writes a `seat` log line. A player who rejoins
+  with the same name gets the seat back automatically. Heartbeat: ping every 4 s, 12 s of silence = dropped
+  (WebRTC close events often never fire on phones).
+- **Stats file format:** the `.md` report is readable and carries the stats as a JSON block at the end, so it
+  loads back without a parser for the tables. A game log `.json` loads too (stats recomputed). The CSV is
+  export-only (long format: one row per crew per round). Recent games' stats are kept in localStorage
+  (`hsp:recentStats`, last 8) so another tab can open them without a file. Images come from the SVG card, so
+  no screenshot library (html2canvas) is needed.
+- Posted Up's end-of-game payout lands after the last round's history, so stats show it as a separate
+  "end of game" adjustment (and an "end" point on the chart) instead of folding it into round 8.
 - Final-standings roll-off uses a d6 plus a hidden tiebreak digit so it never loops; the log shows the d6.
 
 ### Hosting: is GitHub Pages enough?
@@ -128,8 +143,9 @@ introducing the peers. Limits and fallbacks:
 Sized so a cloud session can take them one by one. ✅ = done.
 
 **A. Playtest-critical**
-1. Online hardening: show who is connected in-game; host "replace a dropped player with a bot"; client
-   reconnect button; heartbeat. Test across two real networks (phone hotspot + home Wi-Fi).
+1. ✅ Online hardening: show who is connected in-game; host "replace a dropped player with a bot"; client
+   reconnect button; heartbeat. **Still to do:** test across two real networks (phone hotspot + home Wi-Fi).
+   Also possible: a TURN server for networks that block direct WebRTC.
 2. ✅ Reveal moment: animate the flip (cards turn over), show each crew's line beside their box for a few seconds,
    highlight what changed (corner taken, damage +N). Today the log + dimmed "last round" lines carry it.
 3. ✅ A round summary strip ("Round 3: Ana +1 damage, Ben took the Lot…") above the action panel.
@@ -149,6 +165,8 @@ Sized so a cloud session can take them one by one. ✅ = done.
 
 **C. Data for QA + Business**
 11. Results page: drop several log `.json` files, compare modes (win spread, game length, survey answers).
+    Partly there: the stats screen loads several files and shows one report each; a side-by-side comparison
+    table across games is the next step.
 12. Per-round one-tap question "did another crew change your cast?" (yes/no) stored in the log.
 13. Smarter bots (the "aware" bot from `Docs/Concept Rework/evidence/posted_up_test.py`) and a sim report per mode.
 
@@ -196,3 +214,31 @@ simulator before committing, and append to §6.
   errors, no sideways scroll at 375 px.
 - Open: not tried on a real phone or in online play with a client (the reveal is driven by views, so it
   should work the same). A1 (online hardening) and A4 (log replay) not started.
+
+### 2026-10-31 · Claude Code (cloud, Opus 5.5) · A1 online hardening, post-game stats
+- **A1:**
+  - `net/peer.js`: ping/pong heartbeat, 12 s silence = dropped, on both sides.
+  - The host sends `net` (online seats, connected, bot playing) with every view.
+  - An in-game strip shows who is connected. The host gets **Bot takes over** / **Give back** buttons
+    (`setSeatKind`). A rejoining player gets the seat back automatically. The client gets a **Reconnect** button
+    (in game and in the waiting lobby).
+- **Stats:**
+  - `ui/stats.js` and `ui/statsView.js`, as described in §2.
+  - Entry points: the **Stats** button in the top bar (current game, at any time), **Game stats** on the end
+    screen, and the lobby section *Game stats* (load .md/.json files, drop files, or open recent games).
+  - Downloads: .md, .csv, .png, .jpg.
+  - Round history now also records `cards` and `rolls` (Thumb results).
+  - The game log is now version 2: it adds `timing`, `seed`, `color`, `thumbs`, `wheelNames` and
+    `modifierNames`.
+- Click handler: buttons inside a modal now work (before, only the close button did).
+- Verified:
+  - `npm test` (14 tests; new `tests/stats.test.js`: seat hand-over keeps replay exact, the timer counts every
+    decision once, stats totals match the engine in all 4 modes, .md and log round-trip) and
+    `node tools/simulate.mjs 50` pass.
+  - Playwright: an all-bot Posted Up short game, then the stats modal and all 4 downloads. A second tab saw the
+    recent game and loaded the .md back. Checked at 375 px.
+  - Online with two browser contexts over a real WebRTC connection, using a local PeerJS signalling server,
+    because the sandbox blocks the public broker and the CDN: the client tab was killed, the host saw "dropped"
+    after about 15 s, the bot took over and played on, the client rejoined, got the seat back and the bot
+    stopped. The host then cut the connection, and the client's Reconnect button restored it.
+- Open: two real networks / phones (needs people); comparing several games side by side (C11).

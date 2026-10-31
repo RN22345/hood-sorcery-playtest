@@ -138,6 +138,24 @@ code { background: #000a; padding: 0 .3em; border-radius: 4px; }
 .modal-box blockquote { border-left: 3px solid var(--gold); margin: .5rem 0; padding-left: .8rem; color: var(--ink2); }
 .close { position: sticky; top: 0; float: right; font-size: 1.2rem; }
 
+/* game stats */
+.stats-card { width: 100%; height: auto; display: block; border-radius: var(--radius); }
+.stats { display: grid; gap: .5rem; }
+.lobby > *, .stats > * { min-width: 0; }
+.statsview .stats { background: var(--bg2); border: 1px solid var(--line); border-radius: var(--radius); padding: .8rem; }
+.stats-md { overflow-x: auto; }
+.stats-md table { border-collapse: collapse; margin: .4rem 0; font-size: .85rem; }
+.stats-md td, .stats-md th { border: 1px solid var(--line); padding: .2rem .4rem; text-align: left; }
+.stats-md h2 { margin-top: .8rem; }
+.file input { display: block; margin-top: .3rem; }
+
+/* online connection strip (A1) */
+.netstrip { display: flex; flex-wrap: wrap; gap: .4rem .7rem; align-items: center; font-size: .85rem; padding: .35rem .7rem; border: 1px dashed var(--line); border-radius: var(--radius); }
+.conn::before { content: "●"; margin-right: .3rem; }
+.conn.on::before { color: var(--ok); } .conn.off::before { color: var(--red); }
+.conn.off { color: #ffb3ab; }
+.netstrip button { padding: .2rem .5rem; font-size: .8rem; }
+
 /* reveal moment (A2) and round summary (A3) */
 .summary { display: flex; flex-wrap: wrap; gap: .35rem .5rem; align-items: center; font-size: .85rem; padding: .35rem .7rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg2); }
 .summary > b { color: var(--gold); font-family: Gelasio, serif; }

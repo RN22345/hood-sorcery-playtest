@@ -4,12 +4,14 @@
 //            only viewFor(state, theirSeat)
 //   client - joined someone's room; renders the views it receives, sends its answers
 // No rules here: the engine decides everything.
-import { prepareData, createGame, act, viewFor, botChoice, makeCtx } from "../engine/game.js";
+import { prepareData, createGame, act, viewFor, botChoice, makeCtx, setSeatKind } from "../engine/game.js";
 import { modifierProblems } from "../engine/registry.js";
 import { castProblem, allowedZones } from "../engine/cast.js";
 import { Host, Client } from "../net/peer.js";
 import * as V from "./views.js";
 import { md } from "./md.js";
+import { Timer, computeStats, statsMarkdown, statsCsv, parseStatsFile } from "./stats.js";
+import { statsPanel, statsImage } from "./statsView.js";
 
 const root = document.getElementById("app");
 const getJson = (p) => fetch(p).then((r) => { if (!r.ok) throw new Error(`${p}: ${r.status}`); return r.json(); });
@@ -28,6 +30,7 @@ const app = {
   botDelay: 220,
   reveal: { seen: 0, until: 0, fresh: false }, // the few seconds after a round's cards flip
   modProblem(mode, m) { return modifierProblems(mode, m)[0] || ""; },
+  netSeats: () => netSeats(),
 };
 window.hsApp = app; // handy in the console while playtesting
 
@@ -90,7 +93,10 @@ function draftCast() {
 
 function render() {
   let html;
-  if (app.screen === "lobby") {
+  if (app.screen === "stats") {
+    html = V.statsScreen(app, app.statsList.map(statsPanel).join(""));
+  } else if (app.screen === "lobby") {
+    app.recentStats = store.get("recentStats", []);
     html = app.role === "client" ? V.clientLobby(app) : V.lobby(app);
     if (app.role === "host") broadcastLobby();
   } else {
@@ -98,6 +104,8 @@ function render() {
     if (!v) { root.innerHTML = "<p class='muted'>Waiting for the host…</p>"; return; }
     prepareDraft(v);
     trackReveal(v);
+    (app.timer ||= new Timer(Date.now())).observe(v, Date.now());
+    if (v.over && !app.statsSaved) { app.statsSaved = true; rememberStats(computeStats(gameRecord())); }
     html = V.game(app, v);
     app.reveal.fresh = false; // the flip animates once; later renders keep only the highlights
   }
@@ -122,11 +130,13 @@ function startGame() {
   app.setup = { modeId: mode.id, modifiers: mods.map((m) => m.id), seats, seed: lob.seed };
   app.localSeats = lob.seats.map((s, i) => (s.kind === "human" ? i : -1)).filter((i) => i >= 0);
   app.role = lob.seats.some((s) => s.kind === "online") ? "host" : "local";
+  app.onlineSeats = lob.seats.map((s, i) => (s.kind === "online" ? i : -1)).filter((i) => i >= 0);
   app.screen = "game";
   app.unlocked = null;
   app.survey = { best: "", obvious: "", reads: "", fun: "" };
   app.lobbyError = "";
   app.reveal = { seen: 0, until: 0, fresh: false };
+  app.timer = new Timer(Date.now()); app.statsSaved = false;
   changed();
 }
 
@@ -177,8 +187,9 @@ function leave() {
   if (app.screen === "game" && app.st && !app.st.over && app.role !== "client" && !confirm("Leave this game?")) return;
   clearTimeout(app.botTimer); clearTimeout(app.revealTimer);
   app.reveal = { seen: 0, until: 0, fresh: false };
+  app.timer = null; app.statsSaved = false;
   app.net.host?.close(); app.net.client?.close();
-  Object.assign(app, { screen: "lobby", role: null, st: null, view: null, seat: null, remoteLobby: null, error: "" });
+  Object.assign(app, { screen: "lobby", role: null, st: null, view: null, seat: null, remoteLobby: null, remoteNet: null, onlineSeats: [], error: "" });
   app.net = { code: null, status: "", seatNames: {}, conn2seat: {} };
   app.lob.seed = newSeed();
   render();
@@ -190,14 +201,21 @@ async function openHost() {
   const host = new Host({
     onHello(connId, name) {
       const { lob, net } = app;
-      let seat = Object.keys(net.seatNames).map(Number).find((i) => net.seatNames[i] === name && !Object.values(net.conn2seat).includes(i));
+      const connected = Object.values(net.conn2seat);
+      let seat = Object.keys(net.seatNames).map(Number).find((i) => net.seatNames[i] === name && !connected.includes(i));
       if (seat == null && app.screen === "lobby") {
         seat = lob.seats.findIndex((s, i) => s.kind === "online" && !net.seatNames[i]);
         if (seat < 0) seat = null;
         else net.seatNames[seat] = name;
       }
       net.conn2seat[connId] = seat ?? null;
-      queueMicrotask(() => { if (app.screen === "game") sendView(connId); render(); });
+      queueMicrotask(() => {
+        if (app.screen !== "game") { render(); return; }
+        // a dropped player who comes back takes their seat back from the bot
+        if (seat != null && app.onlineSeats.includes(seat) && app.st.players[seat].kind === "bot") app.st = setSeatKind(app.st, seat, "human");
+        app.net.status = seat != null ? `${name} is connected.` : app.net.status;
+        changed();
+      });
       return seat ?? null;
     },
     onAct(connId, value) {
@@ -212,7 +230,8 @@ async function openHost() {
       const seat = app.net.conn2seat[connId];
       delete app.net.conn2seat[connId];
       if (app.screen === "lobby" && seat != null) delete app.net.seatNames[seat];
-      app.net.status = seat != null ? `${app.data.crews[seat].seat} disconnected${app.screen === "game" ? " (they can rejoin with the same name)" : ""}` : app.net.status;
+      app.net.status = seat != null ? `${app.net.seatNames[seat] || app.data.crews[seat].seat} disconnected${app.screen === "game" ? ": they can rejoin with the same name, or a bot can take over" : ""}` : app.net.status;
+      if (app.screen === "game") broadcastViews();
       render();
     },
     onStatus(s) { app.net.status = s; render(); },
@@ -232,8 +251,19 @@ function broadcastLobby() {
   host.each((id) => host.send(id, { t: "lobby", lobby }));
 }
 
-const sendView = (connId) => app.net.host.send(connId, { t: "view", view: viewFor(app.st, app.data, app.net.conn2seat[connId] ?? null) });
+// Online seats and who is connected right now, for the in-game connection strip (host and clients).
+function netSeats() {
+  const on = Object.values(app.net.conn2seat);
+  return (app.onlineSeats || []).map((i) => ({ seat: i, name: app.net.seatNames[i] || app.data.crews[i].seat, on: on.includes(i), bot: app.st?.players[i].kind === "bot" }));
+}
+const sendView = (connId) => app.net.host.send(connId, { t: "view", view: viewFor(app.st, app.data, app.net.conn2seat[connId] ?? null), net: netSeats() });
 function broadcastViews() { app.net.host?.each((id) => sendView(id)); }
+
+function reconnect() {
+  app.net.client?.close();
+  app.net.lost = false;
+  joinRoom();
+}
 
 async function joinRoom() {
   const { joinName, joinCode } = app.lob;
@@ -243,18 +273,18 @@ async function joinRoom() {
   app.net.code = joinCode.trim().toUpperCase();
   const client = new Client({
     onMessage(m) {
-      if (m.t === "welcome") app.seat = m.seat;
+      if (m.t === "welcome") { app.seat = m.seat; app.net.lost = false; app.net.status = `Connected to room ${app.net.code}.`; }
       else if (m.t === "lobby") app.remoteLobby = m.lobby;
-      else if (m.t === "view") { app.view = m.view; app.screen = "game"; app.error = ""; }
+      else if (m.t === "view") { app.view = m.view; app.remoteNet = m.net || []; app.screen = "game"; app.error = ""; }
       else if (m.t === "error") app.error = m.text;
       render();
     },
     onStatus(s) { app.net.status = s; render(); },
-    onClose() { app.net.status = "Disconnected from the host. Rejoin with the same name to get your seat back."; render(); },
+    onClose() { app.net.lost = true; app.net.status = "Lost the connection to the host. Press Reconnect: you get your seat back."; render(); },
   });
   app.net.client = client;
   render();
-  try { await client.join(app.net.code, joinName.trim()); } catch (e) { app.net.status = `Couldn't join: ${e.type || e.message}. Check the code.`; render(); }
+  try { await client.join(app.net.code, joinName.trim()); } catch (e) { app.net.lost = true; app.net.status = `Couldn't join: ${e.type || e.message}. Check the code, or try Reconnect.`; render(); }
 }
 
 // ------------------------------------------------------------------ misc actions
@@ -267,20 +297,76 @@ async function openRules() {
   render();
 }
 
-function download() {
+// The game as a record: the downloaded log, and the input to the stats (ui/stats.js).
+function gameRecord() {
   const v = currentView();
-  const out = {
-    kind: "hood-sorcery-playtest-log", version: 1, date: new Date().toISOString(),
-    setup: app.setup, role: app.role, viewer: v.you,
+  return {
+    kind: "hood-sorcery-playtest-log", version: 2, date: new Date().toISOString(),
+    setup: app.setup, role: app.role, viewer: v.you, seed: v.seed,
     mode: v.mode, result: v.result, survey: app.survey,
-    players: v.players.map((p) => ({ seat: p.seat, crew: p.crew, name: p.name, kind: p.kind, tracks: p.tracks, hist: p.hist })),
+    players: v.players.map((p) => ({ seat: p.seat, crew: p.crew, color: p.color, name: p.name, kind: p.kind, thumbs: p.thumbs, tracks: p.tracks, hist: p.hist })),
     actions: app.st?.actions ?? null, log: v.log,
+    timing: app.timer ? { ...app.timer.t, last: Date.now() } : null,
+    wheelNames: Object.fromEntries(app.data.wheel.map((w) => [w.id, w.name])),
+    modifierNames: Object.fromEntries(Object.values(app.modifiers).map((m) => [m.id, m.name])),
   };
+}
+
+function saveFile(name, body, type) {
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: "application/json" }));
-  a.download = `hood-sorcery-${v.mode.id}-${v.seed}-${Date.now()}.json`;
+  a.href = URL.createObjectURL(body instanceof Blob ? body : new Blob([body], { type }));
+  a.download = name;
   a.click();
-  URL.revokeObjectURL(a.href);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function download() {
+  const rec = gameRecord();
+  saveFile(`hood-sorcery-${rec.mode.id}-${rec.seed}-${Date.now()}.json`, JSON.stringify(rec, null, 1), "application/json");
+}
+
+// ------------------------------------------------------------------ stats
+const statsAt = (i) => (i === "cur" ? app.curStats : app.statsList[+i]);
+const statsName = (s, ext) => `hood-sorcery-${s.mode.id}-${s.seed ?? "game"}-stats.${ext}`;
+
+function openStats() {
+  app.curStats = computeStats(gameRecord());
+  app.modal = statsPanel(app.curStats, "cur");
+  render();
+}
+
+function rememberStats(s) {
+  const list = store.get("recentStats", []).filter((x) => !(x.seed === s.seed && x.mode.id === s.mode.id));
+  store.set("recentStats", [s, ...list].slice(0, 8));
+}
+
+async function loadStatsFiles(files) {
+  const list = [], bad = [];
+  for (const f of files) {
+    try { list.push(parseStatsFile(await f.text())); } catch { bad.push(f.name); }
+  }
+  app.lobbyError = bad.length ? `Couldn't read ${bad.join(", ")}: load a stats .md or a game log .json.` : "";
+  if (list.length) showStats(list); else render();
+}
+
+function showStats(list) {
+  app.statsList = list;
+  app.screen = "stats";
+  app.modal = null;
+  render();
+  scrollTo(0, 0);
+}
+
+async function statsDownload(act, el) {
+  const s = statsAt(el.dataset.i);
+  if (!s) return;
+  if (act === "statsMd") saveFile(statsName(s, "md"), statsMarkdown(s), "text/markdown");
+  else if (act === "statsCsv") saveFile(statsName(s, "csv"), statsCsv(s), "text/csv");
+  else {
+    const type = el.dataset.type || "image/png";
+    try { saveFile(statsName(s, type.split("/")[1].replace("jpeg", "jpg")), await statsImage(s, type)); }
+    catch (e) { alert(e.message); }
+  }
 }
 
 function saveLobby() { store.set("lobby", { modeId: app.lob.modeId, mods: app.lob.mods, seats: app.lob.seats.map((s) => ({ kind: s.kind, name: s.name })), joinName: app.lob.joinName }); }
@@ -294,10 +380,11 @@ function fitSeats() {
 
 // ------------------------------------------------------------------ events
 root.addEventListener("click", (e) => {
-  if (e.target.closest("[data-stop]") && !e.target.closest(".close")) return;
-  const cardEl = e.target.closest("[data-card]");
-  if (cardEl && app.screen === "game") return clickCard(cardEl.dataset.card, cardEl);
   const t = e.target.closest("[data-act]");
+  const stop = e.target.closest("[data-stop]");
+  if (stop && !(t && stop.contains(t))) return; // clicks inside a modal only count on its own buttons
+  const cardEl = e.target.closest("[data-card]");
+  if (cardEl && app.screen === "game" && !stop) return clickCard(cardEl.dataset.card, cardEl);
   if (!t || t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA") return;
   const d = app.draft, v = app.screen === "game" ? currentView() : null;
   switch (t.dataset.act) {
@@ -320,6 +407,16 @@ root.addEventListener("click", (e) => {
     case "clear": d.lines = {}; d.thumbs = []; break;
     case "lock": submit(draftCast()); return;
     case "download": download(); return;
+    case "reconnect": reconnect(); return;
+    case "stats": openStats(); return;
+    case "statsMd": case "statsCsv": case "statsImg": statsDownload(t.dataset.act, t); return;
+    case "recentStats": showStats([app.recentStats[+t.dataset.i]]); return;
+    case "recentAll": showStats(app.recentStats); return;
+    case "statsBack": app.screen = "lobby"; app.statsList = []; break;
+    case "seatBot": case "seatHuman":
+      if (app.role !== "host") return;
+      app.st = setSeatKind(app.st, +t.dataset.i, t.dataset.act === "seatBot" ? "bot" : "human");
+      changed(); return;
     default: return;
   }
   render();
@@ -347,12 +444,21 @@ function clickCard(id, elx) {
 
 root.addEventListener("change", (e) => {
   const t = e.target, a = t.dataset.act, lob = app.lob;
+  if (a === "statsFile") { loadStatsFiles([...t.files]); return; }
   if (a === "mode") { lob.modeId = t.value; fitSeats(); }
   else if (a === "mod") lob.mods = t.checked ? [...lob.mods, t.value] : lob.mods.filter((x) => x !== t.value);
   else if (a === "seatKind") lob.seats[+t.dataset.i].kind = t.value;
   else return;
   saveLobby();
   render();
+});
+
+// drop stats reports / game logs anywhere on the lobby
+root.addEventListener("dragover", (e) => { if (app.screen !== "game") e.preventDefault(); });
+root.addEventListener("drop", (e) => {
+  if (app.screen === "game" || !e.dataTransfer?.files.length) return;
+  e.preventDefault();
+  loadStatsFiles([...e.dataTransfer.files]);
 });
 
 root.addEventListener("input", (e) => {

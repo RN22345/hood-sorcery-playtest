@@ -68,6 +68,10 @@ export function lobby(app) {
         : `<div class="row"><button class="primary" data-act="start">Start on this device</button><span class="muted">Hot-seat: humans pass the device; bots play themselves.</span></div>`}
       <p class="muted small">${esc(net.status || "")}</p>
     </section>
+    <section class="stats-load"><h2>Game stats <small class="muted">look at a finished game</small></h2>
+      ${app.recentStats?.length ? `<div class="row"><span class="muted small">Recent on this browser:</span>${app.recentStats.map((s, i) => `<button data-act="recentStats" data-i="${i}" title="${esc(s.generated || "")}">${esc(s.mode.name)} · ${esc(s.winner || "?")} won</button>`).join("")}${app.recentStats.length > 1 ? `<button data-act="recentAll">All</button>` : ""}</div>` : ""}
+      <div class="row"><label class="file">Load a stats report (.md) or game log (.json) <input type="file" accept=".md,.json,.txt" multiple data-act="statsFile"></label><span class="muted small">or drop the files on this page</span></div>
+    </section>
     <section class="join"><h2>Join a friend's room</h2>
       <div class="row"><input data-act="joinName" placeholder="Your name" value="${esc(lob.joinName)}" maxlength="24"><input data-act="joinCode" placeholder="Room code" value="${esc(lob.joinCode)}" size="7"><button data-act="join">Join</button></div>
     </section>
@@ -83,8 +87,17 @@ export function clientLobby(app) {
     ${l ? `<p>Mode: <b>${esc(app.modes[l.modeId]?.name)}</b>${l.mods.length ? " + " + l.mods.map((id) => esc(app.modifiers[id]?.name)).join(", ") : ""}</p>
       <ul>${l.seats.map((s, i) => `<li>${app.data.crews[i].seat}: ${esc(s)}</li>`).join("")}</ul>` : ""}
     <p class="muted">Waiting for the host to start…</p>
+    ${app.net.lost ? `<button class="primary" data-act="reconnect">Reconnect</button>` : ""}
     <p class="muted small">${esc(app.net.status || "")}</p>
   </section></main>`;
+}
+
+export function statsScreen(app, panels) {
+  return `${topbar(app, "Game stats")}
+  <main class="lobby statsview">
+    <div class="row"><button data-act="statsBack">← Back to lobby</button><span class="muted small">${app.statsList.length} game${app.statsList.length > 1 ? "s" : ""}</span></div>
+    ${panels}
+  </main>`;
 }
 
 export function topbar(app, sub) {
@@ -92,7 +105,7 @@ export function topbar(app, sub) {
     <div class="brand"><b>Hood Sorcery</b> <span class="muted">${esc(sub)}</span></div>
     <nav>
       <button data-act="rules">Rules</button>
-      ${app.screen === "game" ? `<button data-act="toggleLog">Log</button><button data-act="leave">Leave</button>` : ""}
+      ${app.screen === "game" ? `<button data-act="stats">Stats</button><button data-act="toggleLog">Log</button><button data-act="leave">Leave</button>` : ""}
     </nav></header>`;
 }
 
@@ -119,7 +132,7 @@ export function game(app, v) {
   const cover = app.cover != null ? coverScreen(app, v, sum) : "";
   return `${topbar(app, `${v.mode.name}${v.mode.modifiers.length ? " + " + v.mode.modifiers.map((id) => app.modifiers[id]?.name || id).join(", ") : ""}`)}
   <main class="game ${app.showLog ? "with-log" : ""} ${app.revealing ? "revealing" : ""} ${app.revealing && app.reveal.fresh ? "fresh" : ""}">
-    <div class="table">${head}${zones}${players}${body}${hand}</div>${log}
+    <div class="table">${head}${netStrip(app)}${zones}${players}${body}${hand}</div>${log}
   </main>${cover}`;
 }
 
@@ -133,6 +146,23 @@ function summaryStrip(v, sum, hot) {
     ? sum.items.map((i) => `<span class="sum-item ${i.kind}" style="--c:${v.players[i.pid].color}">${esc(i.text)}</span>`).join("")
     : `<span class="muted">no change</span>`;
   return `<div class="summary ${hot ? "hot" : ""}" title="${esc(sum.text)}"><b>Round ${sum.round}</b>${items}</div>`;
+}
+
+// Online games: who is connected. The host can hand a dropped seat to a bot (and back); a client can reconnect.
+function netStrip(app) {
+  const seats = app.role === "host" ? app.netSeats() : app.role === "client" && !app.net.lost ? app.remoteNet || [] : [];
+  if (app.role !== "client" && !seats.length) return "";
+  const me = app.role === "client"
+    ? `<span class="conn ${app.net.lost ? "off" : "on"}">You: ${app.net.lost ? "disconnected" : "connected"}</span>${app.net.lost ? `<button class="primary" data-act="reconnect">Reconnect</button>` : ""}`
+    : "";
+  const list = seats.map((s) => {
+    const p = app.data.crews[s.seat];
+    const btn = app.role !== "host" || app.screen !== "game" ? ""
+      : s.bot ? `<button data-act="seatHuman" data-i="${s.seat}" title="Stop the bot; ${esc(s.name)} decides again">Give back</button>`
+      : !s.on ? `<button data-act="seatBot" data-i="${s.seat}">Bot takes over</button>` : "";
+    return `<span class="conn ${s.on ? "on" : "off"}" style="--c:${p.color}"><span class="chip" style="--c:${p.color}">${esc(s.name)}</span> ${s.on ? "connected" : "dropped"}${s.bot ? " · bot playing" : ""}</span>${btn}`;
+  }).join("");
+  return `<div class="netstrip">${me}${list}${app.net.status ? `<span class="muted small">${esc(app.net.status)}</span>` : ""}</div>`;
 }
 
 function fxText(v, sector) {
@@ -283,7 +313,8 @@ function endPanel(app, v) {
     <label class="q">A round where the choice was obvious (Flow)<textarea data-act="survey" data-k="obvious" rows="2">${esc(s.obvious)}</textarea></label>
     <label class="q">Did you change a cast because of another crew? How often?<textarea data-act="survey" data-k="reads" rows="2">${esc(s.reads)}</textarea></label>
     <label class="q">Fun, 1–5 <input data-act="survey" data-k="fun" value="${esc(s.fun)}" size="3"></label>
-    <div class="row"><button class="primary" data-act="download">Download game log (.json)</button><button data-act="leave">Back to lobby</button></div>
+    <div class="row"><button class="primary" data-act="download">Download game log (.json)</button><button class="primary" data-act="stats">Game stats</button><button data-act="leave">Back to lobby</button></div>
+    <p class="muted small">Game stats: timing, economy and per-crew numbers, downloadable as a report (.md), a spreadsheet (.csv) or an image.</p>
   </div>`;
 }
 

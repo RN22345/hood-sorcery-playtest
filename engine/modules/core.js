@@ -174,9 +174,10 @@ export default {
       id: "roundEnd", phase: "ROUND_END", order: 90, kind: "auto",
       run(st, ctx) {
         for (const pl of st.players) {
-          const r = st.res[pl.id] || { atk: 0, blk: 0, len: 0 };
+          const r = st.res[pl.id] || { atk: 0, blk: 0, len: 0, lines: [], rolls: [] };
           pl.hist.push({ r: st.round, wheel: st.wheel, dmg: st.rd[pl.id], damage: pl.tracks.damage, rep: pl.tracks.rep, atk: r.atk, blk: r.blk, len: r.len, at: pl.at,
-            holds: st.zones.filter((z) => z.holder === pl.id).map((z) => z.name) });
+            holds: st.zones.filter((z) => z.holder === pl.id).map((z) => z.name),
+            cards: r.lines.reduce((a, l) => a + l.cards.length, 0), rolls: r.rolls.map((x) => x.r) });
         }
         if (st.round < ctx.p.rounds) return;
         for (const m of ctx.mods) m.gameEnd?.(st, ctx);

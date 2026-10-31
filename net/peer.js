@@ -8,12 +8,16 @@
 //   host -> client  { t:'lobby', lobby }           seats + mode while the host is setting up
 //   host -> client  { t:'view', view }             viewFor(state, seat): only what that seat may see
 //   host -> client  { t:'error', text }
+//   host -> client  { t:'net', seats }             who is connected: { [seat]: { name, on, bot } }
+//   both ways       { t:'ping' } / { t:'pong' }    heartbeat every 4 s; 12 s of silence = dropped
+//                                                  (WebRTC close events often never fire on phones)
 //
 // To swap transport (Supabase Realtime, Firebase, Unity Relay), rewrite this file only.
 
 const PREFIX = "hood-sorcery-pt-";
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const PEERJS = "https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js";
+const BEAT_MS = 4000, DEAD_MS = 12000;
 
 export function newCode(len = 5) {
   let s = "";
@@ -55,16 +59,34 @@ export class Host {
       this.peer.on("disconnected", () => this.peer.reconnect());
       this.peer.on("connection", (conn) => {
         conn.on("data", (raw) => this._msg(conn, raw));
-        conn.on("close", () => { this.conns.delete(conn.peer); this.h.onLeave?.(conn.peer); });
+        conn.on("close", () => this._drop(conn.peer));
+        conn.on("error", () => this._drop(conn.peer));
       });
+      clearInterval(this.beat);
+      this.beat = setInterval(() => {
+        const now = Date.now();
+        for (const [id, c] of this.conns) {
+          if (now - c.seen > DEAD_MS) { c.conn.close(); this._drop(id); } else this.send(id, { t: "ping" });
+        }
+      }, BEAT_MS);
     });
+  }
+
+  _drop(connId) {
+    if (!this.conns.delete(connId)) return;
+    this.h.onLeave?.(connId);
   }
 
   _msg(conn, raw) {
     const m = typeof raw === "string" ? JSON.parse(raw) : raw;
+    const known = this.conns.get(conn.peer);
+    if (known) known.seen = Date.now();
+    if (m.t === "ping") { this.send(conn.peer, { t: "pong" }); return; }
+    if (m.t === "pong") return;
     if (m.t === "hello") {
+      this.conns.set(conn.peer, { conn, name: m.name, seat: null, seen: Date.now() });
       const seat = this.h.onHello(conn.peer, String(m.name || "Guest").slice(0, 24));
-      this.conns.set(conn.peer, { conn, name: m.name, seat });
+      this.conns.get(conn.peer).seat = seat;
       this.send(conn.peer, { t: "welcome", seat, code: this.code });
     } else if (m.t === "act") this.h.onAct(conn.peer, m.value);
   }
@@ -76,7 +98,7 @@ export class Host {
 
   each(fn) { for (const [id, c] of this.conns) fn(id, c); }
 
-  close() { this.peer?.destroy(); }
+  close() { clearInterval(this.beat); this.peer?.destroy(); }
 }
 
 export class Client {
@@ -90,13 +112,35 @@ export class Client {
       this.peer.on("error", (e) => { this.h.onStatus?.(`Network: ${e.type || e.message}`); fail(e); });
       this.peer.on("open", () => {
         this.conn = this.peer.connect(PREFIX + code.trim().toLowerCase(), { reliable: true });
-        this.conn.on("open", () => { this.conn.send({ t: "hello", name }); this.h.onStatus?.(`Joined room ${code.toUpperCase()}`); ok(); });
-        this.conn.on("data", (raw) => this.h.onMessage(typeof raw === "string" ? JSON.parse(raw) : raw));
-        this.conn.on("close", () => this.h.onClose?.());
+        this.conn.on("open", () => {
+          this.conn.send({ t: "hello", name }); this.h.onStatus?.(`Joined room ${code.toUpperCase()}`);
+          this.seen = Date.now();
+          clearInterval(this.beat);
+          this.beat = setInterval(() => {
+            if (Date.now() - this.seen > DEAD_MS) this._lost();
+            else this.conn.send({ t: "ping" });
+          }, BEAT_MS);
+          ok();
+        });
+        this.conn.on("data", (raw) => {
+          this.seen = Date.now();
+          const m = typeof raw === "string" ? JSON.parse(raw) : raw;
+          if (m.t === "ping") { this.conn.send({ t: "pong" }); return; }
+          if (m.t !== "pong") this.h.onMessage(m);
+        });
+        this.conn.on("close", () => this._lost());
+        this.conn.on("error", () => this._lost());
       });
     });
   }
 
-  act(value) { this.conn?.send({ t: "act", value }); }
-  close() { this.peer?.destroy(); }
+  _lost() {
+    if (this.gone) return;
+    this.gone = true;
+    clearInterval(this.beat);
+    this.h.onClose?.();
+  }
+
+  act(value) { if (this.conn?.open) this.conn.send({ t: "act", value }); }
+  close() { this.gone = true; clearInterval(this.beat); this.peer?.destroy(); }
 }

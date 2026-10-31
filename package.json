@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Hood Sorcery multi-mode playtest site. Static, no build step.",
   "scripts": {
-    "test": "node --test tests/engine.test.js",
+    "test": "node --test tests/engine.test.js tests/stats.test.js",
     "sim": "node tools/simulate.mjs 200",
     "serve": "npx --yes http-server -p 8080 -c-1 ."
   }

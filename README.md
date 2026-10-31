@@ -26,7 +26,9 @@ against bots, or online with a room code. No install, no account, no server.
    turn the screen says *Pass the device to …*; only that player taps *show my hand*.
 3. **Online:** set some seats to *Online player*, press **Open online room**, and send friends the **room
    code** (or the invite link). They open the same page, type a name and the code under *Join a friend's
-   room*. Start when every online seat shows ✔. If someone drops, they rejoin with the **same name**.
+   room*. Start when every online seat shows ✔. During the game a strip shows who is connected. If someone
+   drops, they press **Reconnect** (or rejoin with the **same name**) and get their seat back; meanwhile the
+   host can press **Bot takes over** so the game doesn't stall.
 4. **Playing a round:** the Wheel spins by itself. On your turn click a **zone** (Corners: a corner), then
    click cards in your hand to add them to the line, in order. Click a card in the line to take it back.
    **+ Thumbs** commits Trigger Thumbs. **Lock in** lights up when the line is legal.
@@ -35,7 +37,12 @@ against bots, or online with a room code. No install, no account, no server.
    stays above the action panel. On a phone the hand scrolls sideways and sits at the bottom of the screen.
 6. **Rules** (top right) shows the rules of the mode you're playing. **Log** shows every roll and result.
 7. **At the end:** fill in the 4-question survey and press **Download game log**. Send the `.json` to QA:
-   it holds the seed, every choice, the full log and the survey, and can be replayed exactly.
+   it holds the seed, every choice, the full log, timings and the survey, and can be replayed exactly.
+8. **Game stats** (end screen, or **Stats** in the top bar at any time): standings, a score chart, timing
+   (game, rounds, decisions), economy (damage/Rep in and out, heals, Thumbs, cards, reshuffles, lead changes,
+   margin, Wheel spread) and per-crew averages. Download it as a report (**.md**), a spreadsheet (**.csv**,
+   one row per crew per round) or an image (**.png** / **.jpg**). To look at it again, in any tab: lobby →
+   *Game stats* → load the `.md` or the game log `.json` (or drop several files), or pick a recent game.
 
 Tips: the **seed** makes a game repeatable (same seed + same choices = same game). Bots let 1–2 testers run a
 full 4-crew table. The *Short game* modifier is for quick rules checks.
