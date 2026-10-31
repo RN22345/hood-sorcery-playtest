@@ -66,6 +66,7 @@ async function boot() {
       ["data/cards.json", "data/wheel.json", "data/matrices.json", "data/crews.json", "data/modes/index.json", "data/modifiers.json"].map(getJson));
     app.data = prepareData({ cards, wheel, matrices, crews });
     app.show.h.data = app.data;
+    for (const c of app.data.cards) if (c.img) new Image().src = c.img; // warm the cache: no lazy card art
     app.modes = Object.fromEntries((await Promise.all(modeIds.map((id) => getJson(`data/modes/${id}.json`)))).map((m) => [m.id, m]));
     app.modifiers = Object.fromEntries(modifiers.map((m) => [m.id, m]));
   } catch (e) {

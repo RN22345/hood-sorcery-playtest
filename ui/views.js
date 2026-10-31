@@ -22,7 +22,7 @@ const MODE_ART = { classic: "line", corners: "corner", "hold-the-block": "block"
 export function card(c, { cls = "", tag = "button", style = "" } = {}) {
   const title = `${c.name}: ${c.start} → ${c.end}, length ${c.len}, ATK ${c.atk}, BLK ${c.blk}`;
   const face = c.img
-    ? `<img src="${c.img}" alt="${esc(c.name)}" loading="lazy" draggable="false">`
+    ? `<img src="${c.img}" alt="${esc(c.name)}" draggable="false" onerror="if(!this.dataset.r){this.dataset.r=1;this.src='${c.img}?r='+Date.now()}">`
     : `<div class="card-text"><b>${esc(c.name)}</b>${el(c.start)}→${el(c.end)}<span>L${c.len} · A${c.atk} · B${c.blk}</span></div>`;
   return `<${tag} class="card ${cls}" data-card="${c.id}" title="${esc(title)}" ${style ? `style="${style}"` : ""}>${face}<span class="card-stats">${el(c.start)}${el(c.end)} L${c.len} <b class="a">${c.atk}</b>/<b class="b">${c.blk}</b></span></${tag}>`;
 }
@@ -441,7 +441,7 @@ function zoneBox(app, v, z, hot, holderIdNow) {
     body = `<div class="zlines">${v.players.map((p) => `<div class="zline none" data-k="ln${p.id}" style="--c:${p.color}"><div class="lhead"><span class="chip">${esc(p.name)}</span></div><div class="lcards"><span class="muted">${pend?.done.includes(p.id) ? "✔ locked in" : pend?.who.includes(p.id) ? "casting…" : "waiting"}</span></div></div>`).join("")}</div>`;
   } else body = `<div class="zlines">${lanes.map(({ p, ln }) => lane(p, ln)).join("")}</div>`;
   return `<div class="zone art-${zoneArt(v, z)} ${z.rich ? "rich" : ""} ${z.extra ? "extra" : ""} ${taken ? "taken" : ""} ${focus ? "focus" : ""} ${lanes.length >= 4 ? "crowded" : ""}" data-zone="${esc(z.name)}" style="${holder ? `--h:${holder.color};` : ""}--lanes:${Math.max(2, lanes.length)}">
-    <div class="zhead"><b>${esc(z.name)}</b>${z.rich ? ' <span class="badge">★ rich</span>' : ""}
+    <div class="zhead"><b>${esc(z.name)}</b>${z.rich ? ' <span class="badge">★ rich</span>' : ""}${past && (lanes.length || htb) && res ? ' <span class="badge old">last round</span>' : ""}
       ${v.mode.id === "classic" || htb ? "" : `<span class="holder">${holder ? chip(holder) : '<span class="muted">unclaimed</span>'}</span>`}</div>
     ${loc ? `<div class="loc" title="${esc(loc.text)}"><img src="assets/locations/${z.loc}.svg" alt="" onerror="this.remove()"><b>${esc(loc.name)}</b> ${esc(loc.text)}</div>` : ""}
     ${posted.length && !v.revealed ? `<div class="posted">${posted.map(chip).join(" ")}</div>` : ""}

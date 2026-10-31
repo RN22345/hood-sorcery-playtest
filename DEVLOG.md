@@ -419,3 +419,11 @@ simulator before committing, and append to §6.
   settings and rules modals, no console errors.
 - Open: the lo-fi music doesn't fit the theme (ART_TODO); a real phone; the results pop-up for Corners shows the
   table only (no matrix there by design).
+
+### 2026-10-31 · Claude Code (cloud, Sonnet 5.5) · Small fixes from playtest: card art loading, "last round" tag
+- Card images no longer use `loading="lazy"`, retry once on error, and are preloaded at boot (a tester saw a broken
+  Stonewall card; the file itself is valid and drags fine here, so the cause is most likely a lazy or failed fetch).
+- Zones that still show the previous round's dimmed lines now carry a "last round" tag (it was confusing during
+  the Run It Up choice).
+- Verified: `npm test` (23), Playwright Classic rounds, tag appears from round 2, no console errors.
+- Open (design, not built): show opponents' lead card before the Run It Up choice (see the discussion; needs a rule decision).
