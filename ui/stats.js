@@ -6,6 +6,7 @@
 //   computeStats(record)                        -> stats object (kind "hood-sorcery-stats")
 //   statsMarkdown(stats), statsCsv(stats)       -> text files
 //   parseStatsFile(text)                        -> stats, from a .md report, a stats .json or a game log .json
+//   compareStats(list), compareMarkdown, compareCsv   several games side by side + per-mode averages
 
 export const STATS_KIND = "hood-sorcery-stats";
 const MD_MARK = "<!-- hood-sorcery-stats data: this block lets the playtest site load the report back -->";
@@ -118,6 +119,7 @@ export function computeStats(rec) {
     track, unit, best, roundsPlayed: R, roundsPlanned: rec.mode.params?.rounds ?? R, over: !!rec.result,
     winner: rec.result ? winner?.name : null,
     players, rounds,
+    survey: rec.survey && Object.values(rec.survey).some((x) => String(x).trim()) ? rec.survey : null,
     economy: {
       tableTotal: sum(players.map((p) => p.final)),
       endAdjustTotal: sum(players.map((p) => p.endAdjust)),
@@ -180,6 +182,8 @@ export function statsMarkdown(s) {
     `- Thumbs used: ${e.thumbsUsed}. Cards cast: ${e.cardsCast ?? "–"}. Deck reshuffles: ${e.reshuffles}. Roll-offs: ${e.rolloffs}.`,
     `- Lead changes: ${e.leadChanges}. Final margin: ${e.finalMargin} ${s.unit}. Winner's worst place during the game: ${e.winnerWorstPlace ?? "–"}.`,
     `- Wheel: ${Object.entries(e.wheelCounts).map(([k, n]) => `${k} ×${n}`).join(", ") || "–"}.`,
+    ...(s.survey ? ["", "## Survey", "", ...[["best", "Best moment"], ["obvious", "Obvious choice"], ["reads", "Changed a cast because of another crew"], ["fun", "Fun (1–5)"]]
+      .filter(([k]) => String(s.survey[k] ?? "").trim()).map(([k, label]) => `- **${label}:** ${String(s.survey[k]).replace(/\s+/g, " ")}`)] : []),
     "",
     MD_MARK,
     "```json",
@@ -210,6 +214,55 @@ export function statsCsv(s) {
     });
   }
   return [head, ...rows].map((r) => r.map(csvCell).join(",")).join("\n") + "\n";
+}
+
+// ------------------------------------------------------------------ several games
+const funOf = (s) => { const x = parseFloat(s.survey?.fun); return Number.isFinite(x) ? x : null; };
+const avgOrNull = (a) => { const v = a.filter((x) => x != null); return v.length ? r1(avg(v)) : null; };
+
+/** One row per game, plus averages per mode (game length, margin, lead changes, seat win share, fun). */
+export function compareStats(list) {
+  const games = list.map((s, i) => ({
+    i: i + 1, mode: s.mode.name, modeId: s.mode.id, modifiers: s.mode.modifiers.join(", "), players: s.players.length,
+    seed: s.seed, winner: s.winner, winnerSeat: s.players.findIndex((p) => p.place === 1) + 1,
+    rounds: s.roundsPlayed, minutes: s.time ? r1(s.time.durationSec / 60) : null, roundSec: s.time?.avgRoundSec ?? null,
+    unit: s.unit, tableTotal: s.economy.tableTotal, margin: s.economy.finalMargin, leadChanges: s.economy.leadChanges,
+    winnerWorstPlace: s.economy.winnerWorstPlace, thumbs: s.economy.thumbsUsed, fun: funOf(s),
+  }));
+  const byMode = {};
+  for (const g of games) (byMode[g.modeId + "|" + g.modifiers] ||= []).push(g);
+  const modes = Object.values(byMode).map((gs) => {
+    const maxSeats = Math.max(...gs.map((g) => g.players));
+    const seatWins = Array.from({ length: maxSeats }, (_, k) => gs.filter((g) => g.winnerSeat === k + 1).length);
+    return {
+      mode: gs[0].mode, modifiers: gs[0].modifiers, games: gs.length, unit: gs[0].unit,
+      minutes: avgOrNull(gs.map((g) => g.minutes)), roundSec: avgOrNull(gs.map((g) => g.roundSec)),
+      tableTotal: avgOrNull(gs.map((g) => g.tableTotal)), margin: avgOrNull(gs.map((g) => g.margin)),
+      leadChanges: avgOrNull(gs.map((g) => g.leadChanges)), comebacks: gs.filter((g) => g.winnerWorstPlace > 1).length,
+      seatWins, fun: avgOrNull(gs.map((g) => g.fun)),
+    };
+  });
+  return { games, modes };
+}
+
+export function compareMarkdown(c) {
+  return [
+    "## By mode",
+    "",
+    table(["Mode", "Modifiers", "Games", "Avg min", "Avg s/round", "Avg table total", "Avg margin", "Avg lead changes", "Comeback wins", "Wins by seat (P1…)", "Avg fun"],
+      c.modes.map((m) => [m.mode, m.modifiers || "–", m.games, m.minutes, m.roundSec, m.tableTotal != null ? `${m.tableTotal} ${m.unit}` : null, m.margin, m.leadChanges, m.comebacks, m.seatWins.join(" / "), m.fun])),
+    "",
+    "## Games",
+    "",
+    table(["#", "Mode", "Modifiers", "Crews", "Winner", "Rounds", "Min", "Table total", "Margin", "Lead changes", "Winner's worst place", "Thumbs", "Fun", "Seed"],
+      c.games.map((g) => [g.i, g.mode, g.modifiers || "–", g.players, g.winner ? `${g.winner} (P${g.winnerSeat})` : "in progress", g.rounds, g.minutes, `${g.tableTotal} ${g.unit}`, g.margin, g.leadChanges, g.winnerWorstPlace, g.thumbs, g.fun, g.seed])),
+    "",
+  ].join("\n");
+}
+
+export function compareCsv(c) {
+  const keys = ["i", "mode", "modifiers", "players", "seed", "winner", "winnerSeat", "rounds", "minutes", "roundSec", "unit", "tableTotal", "margin", "leadChanges", "winnerWorstPlace", "thumbs", "fun"];
+  return [keys, ...c.games.map((g) => keys.map((k) => g[k]))].map((r) => r.map(csvCell).join(",")).join("\n") + "\n";
 }
 
 /** Accepts a .md report from statsMarkdown, a stats .json, or a downloaded game log .json. */

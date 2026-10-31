@@ -10,7 +10,8 @@ import { castProblem, allowedZones } from "../engine/cast.js";
 import { Host, Client } from "../net/peer.js";
 import * as V from "./views.js";
 import { md } from "./md.js";
-import { Timer, computeStats, statsMarkdown, statsCsv, parseStatsFile } from "./stats.js";
+import { Timer, computeStats, statsMarkdown, statsCsv, parseStatsFile, compareStats, compareMarkdown, compareCsv } from "./stats.js";
+import { buildReplay } from "./replay.js";
 import { statsPanel, statsImage } from "./statsView.js";
 
 const root = document.getElementById("app");
@@ -58,6 +59,7 @@ async function boot() {
 
 // ------------------------------------------------------------------ rendering
 function currentView() {
+  if (app.screen === "replay") return replayView();
   if (app.role === "client") { app.cover = null; app.localCount = 1; return app.view; }
   return viewFor(app.st, app.data, app.focus);
 }
@@ -82,7 +84,7 @@ function trackReveal(v) {
   if (r > app.reveal.seen) {
     app.reveal = { seen: r, until: Date.now() + REVEAL_MS, fresh: true };
     clearTimeout(app.revealTimer);
-    app.revealTimer = setTimeout(() => app.screen === "game" && render(), REVEAL_MS + 50);
+    app.revealTimer = setTimeout(() => (app.screen === "game" || app.screen === "replay") && render(), REVEAL_MS + 50);
   }
   app.revealing = Date.now() < app.reveal.until ? r : 0;
 }
@@ -94,7 +96,15 @@ function draftCast() {
 function render() {
   let html;
   if (app.screen === "stats") {
-    html = V.statsScreen(app, app.statsList.map(statsPanel).join(""));
+    const panels = app.statsList.map((s, i) => statsPanel(s, i, app.statsLogs?.[i]?.actions ? `<button class="primary" data-act="replay" data-i="${i}">Replay this game</button>` : "")).join("");
+    const cmp = app.statsList.length > 1 ? compareStats(app.statsList) : null;
+    html = V.statsScreen(app, panels, cmp && md(compareMarkdown(cmp)));
+  } else if (app.screen === "replay") {
+    const v = replayView();
+    if (app.reveal.seen > (v.revealed ? v.round : v.round - 1)) app.reveal.seen = 0; // stepping back: flip again later
+    trackReveal(v);
+    html = V.game(app, v, { panel: V.replayPanel(app, v, app.rp) });
+    app.reveal.fresh = false;
   } else if (app.screen === "lobby") {
     app.recentStats = store.get("recentStats", []);
     html = app.role === "client" ? V.clientLobby(app) : V.lobby(app);
@@ -302,11 +312,11 @@ function gameRecord() {
   const v = currentView();
   return {
     kind: "hood-sorcery-playtest-log", version: 2, date: new Date().toISOString(),
-    setup: app.setup, role: app.role, viewer: v.you, seed: v.seed,
+    setup: app.screen === "replay" ? app.rp.log.setup : app.setup, role: app.role, viewer: v.you, seed: v.seed,
     mode: v.mode, result: v.result, survey: app.survey,
     players: v.players.map((p) => ({ seat: p.seat, crew: p.crew, color: p.color, name: p.name, kind: p.kind, thumbs: p.thumbs, tracks: p.tracks, hist: p.hist })),
-    actions: app.st?.actions ?? null, log: v.log,
-    timing: app.timer ? { ...app.timer.t, last: Date.now() } : null,
+    actions: app.screen === "replay" ? null : app.st?.actions ?? null, log: v.log,
+    timing: app.timer && app.screen !== "replay" ? { ...app.timer.t, last: Date.now() } : null,
     wheelNames: Object.fromEntries(app.data.wheel.map((w) => [w.id, w.name])),
     modifierNames: Object.fromEntries(Object.values(app.modifiers).map((m) => [m.id, m.name])),
   };
@@ -341,23 +351,92 @@ function rememberStats(s) {
 }
 
 async function loadStatsFiles(files) {
-  const list = [], bad = [];
+  const list = [], logs = [], bad = [];
   for (const f of files) {
-    try { list.push(parseStatsFile(await f.text())); } catch { bad.push(f.name); }
+    try {
+      const text = await f.text();
+      const st = parseStatsFile(text);
+      let log = null;
+      try { const o = JSON.parse(text); if (o.kind === "hood-sorcery-playtest-log") log = o; } catch {}
+      // the same game loaded twice (its log and its .md report) counts once; keep the log for the replay
+      const key = (x) => `${x.mode.id}|${x.seed}|${x.players.map((p) => p.name + ":" + p.final).join(",")}`;
+      const dup = list.findIndex((x) => key(x) === key(st));
+      if (dup >= 0) { logs[dup] ||= log; continue; }
+      list.push(st); logs.push(log);
+    } catch { bad.push(f.name); }
   }
   app.lobbyError = bad.length ? `Couldn't read ${bad.join(", ")}: load a stats .md or a game log .json.` : "";
-  if (list.length) showStats(list); else render();
+  if (list.length) showStats(list, logs); else render();
 }
 
-function showStats(list) {
+function showStats(list, logs = []) {
   app.statsList = list;
+  app.statsLogs = logs;
   app.screen = "stats";
   app.modal = null;
   render();
   scrollTo(0, 0);
 }
 
+// ------------------------------------------------------------------ replay (A4)
+function openReplay(log, back) {
+  try {
+    app.rp = { ...buildReplay(log, app.data, app.modes, app.modifiers), at: 0, back, log, playing: false };
+  } catch (e) { alert(e.message); return; }
+  app.modal = null;
+  app.cover = null; app.localCount = 0;
+  app.reveal = { seen: 0, until: 0, fresh: false };
+  app.screen = "replay";
+  render();
+  scrollTo(0, 0);
+}
+
+// Everything visible: the replay is for after the game, so every hand is shown in the replay panel.
+function replayView() {
+  const st = app.rp.states[app.rp.stops[app.rp.at]];
+  const v = viewFor(st, app.data, null);
+  v.players.forEach((p) => (p.hand = st.players[p.id].hand));
+  const prev = app.rp.at ? app.rp.states[app.rp.stops[app.rp.at - 1]] : null;
+  v.replayNew = prev ? st.log.slice(prev.log.length) : st.log;
+  return v;
+}
+
+function replayGo(to) {
+  const rp = app.rp, last = rp.stops.length - 1;
+  const round = rp.states[rp.stops[rp.at]].round;
+  const at = {
+    start: 0, end: last, prev: rp.at - 1, next: rp.at + 1,
+    prevRound: rp.rounds[round] < rp.at ? rp.rounds[round] : rp.rounds[round - 1] ?? 0,
+    nextRound: rp.rounds[round + 1] ?? last,
+  }[to] ?? +to;
+  rp.at = Math.max(0, Math.min(last, at));
+  if (rp.at === last) replayPlay(false);
+  render();
+}
+
+function replayPlay(on = !app.rp?.playing) {
+  clearInterval(app.replayTimer);
+  if (!app.rp) return;
+  app.rp.playing = on;
+  if (on) app.replayTimer = setInterval(() => replayGo("next"), 900);
+}
+
+function closeReplay() {
+  replayPlay(false);
+  const back = app.rp?.back || "lobby";
+  app.rp = null;
+  app.screen = back;
+  if (back === "game") updateFocus();
+  render();
+}
+
 async function statsDownload(act, el) {
+  if (act === "compareMd" || act === "compareCsv") {
+    const c = compareStats(app.statsList), name = `hood-sorcery-compare-${app.statsList.length}-games`;
+    if (act === "compareMd") saveFile(`${name}.md`, `# Hood Sorcery: ${app.statsList.length} games compared\n\n${compareMarkdown(c)}`, "text/markdown");
+    else saveFile(`${name}.csv`, compareCsv(c), "text/csv");
+    return;
+  }
   const s = statsAt(el.dataset.i);
   if (!s) return;
   if (act === "statsMd") saveFile(statsName(s, "md"), statsMarkdown(s), "text/markdown");
@@ -409,7 +488,11 @@ root.addEventListener("click", (e) => {
     case "download": download(); return;
     case "reconnect": reconnect(); return;
     case "stats": openStats(); return;
-    case "statsMd": case "statsCsv": case "statsImg": statsDownload(t.dataset.act, t); return;
+    case "statsMd": case "statsCsv": case "statsImg": case "compareMd": case "compareCsv": statsDownload(t.dataset.act, t); return;
+    case "replay": openReplay(t.dataset.i === "cur" ? gameRecord() : app.statsLogs[+t.dataset.i], t.dataset.i === "cur" ? "game" : "stats"); return;
+    case "replayGo": replayGo(t.dataset.to); return;
+    case "replayPlay": replayPlay(); render(); return;
+    case "replayClose": closeReplay(); return;
     case "recentStats": showStats([app.recentStats[+t.dataset.i]]); return;
     case "recentAll": showStats(app.recentStats); return;
     case "statsBack": app.screen = "lobby"; app.statsList = []; break;
@@ -445,12 +528,23 @@ function clickCard(id, elx) {
 root.addEventListener("change", (e) => {
   const t = e.target, a = t.dataset.act, lob = app.lob;
   if (a === "statsFile") { loadStatsFiles([...t.files]); return; }
+  if (a === "replaySeek") { replayGo(t.value); return; }
   if (a === "mode") { lob.modeId = t.value; fitSeats(); }
   else if (a === "mod") lob.mods = t.checked ? [...lob.mods, t.value] : lob.mods.filter((x) => x !== t.value);
   else if (a === "seatKind") lob.seats[+t.dataset.i].kind = t.value;
   else return;
   saveLobby();
   render();
+});
+
+// replay: arrow keys step, shift+arrow jumps a round, space plays/pauses
+document.addEventListener("keydown", (e) => {
+  if (app.screen !== "replay" || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if (e.key === "ArrowRight") replayGo(e.shiftKey ? "nextRound" : "next");
+  else if (e.key === "ArrowLeft") replayGo(e.shiftKey ? "prevRound" : "prev");
+  else if (e.key === " ") { replayPlay(); render(); }
+  else return;
+  e.preventDefault();
 });
 
 // drop stats reports / game logs anywhere on the lobby

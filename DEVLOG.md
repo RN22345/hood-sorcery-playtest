@@ -39,7 +39,11 @@ The printed rules authority is **SRD v3.10.20**; the modes here are playtest var
 - **Stats** (`ui/stats.js`, no DOM, tested in Node): `Timer` (round starts and decision times, observed from
   successive views, so it works for local, host and client alike), `computeStats(record)` (record = the
   downloaded game log, v2), `statsMarkdown` / `statsCsv` / `parseStatsFile`. `ui/statsView.js` draws one SVG
-  stats card, shown in the page and exported to PNG/JPEG through a canvas.
+  stats card, shown in the page and exported to PNG/JPEG through a canvas. `compareStats` /
+  `compareMarkdown` / `compareCsv` put several games side by side.
+- **Replay** (`ui/replay.js`, no DOM): `buildReplay(log)` rebuilds every state from the log's setup + actions
+  and marks the stops (each finished decision step). The replay screen reuses the game view with a control
+  panel instead of the action panel, and shows every hand.
   - `modules/*.js`: one rule module each.
 - **Round = fixed phases**: `ROUND_START, PRE_CAST, CAST, PRE_REVEAL, REVEAL, RESOLVE, POST_RESOLVE, REFILL,
   ROUND_END`. Each module contributes **steps** `{ id, phase, order, kind: 'auto'|'choice', when, run | who,
@@ -149,7 +153,7 @@ Sized so a cloud session can take them one by one. ✅ = done.
 2. ✅ Reveal moment: animate the flip (cards turn over), show each crew's line beside their box for a few seconds,
    highlight what changed (corner taken, damage +N). Today the log + dimmed "last round" lines carry it.
 3. ✅ A round summary strip ("Round 3: Ana +1 damage, Ben took the Lot…") above the action panel.
-4. Load a downloaded log and **replay** it step by step (engine `replay()` exists; needs UI).
+4. ✅ Load a downloaded log and **replay** it step by step (engine `replay()` exists; needs UI).
 5. ✅ Mobile layout pass (hand as a horizontal scroller, compact player boxes) — testers will use phones.
    Still to do: try it on a real phone (only checked in a 375 px browser window).
 
@@ -164,9 +168,8 @@ Sized so a cloud session can take them one by one. ✅ = done.
 10. Tier 3 when asked: P5 Beef, P10 Heat Check, P11 Stash Night, P13 Four Hats, P9 Smuggle Run, P14 Partners.
 
 **C. Data for QA + Business**
-11. Results page: drop several log `.json` files, compare modes (win spread, game length, survey answers).
-    Partly there: the stats screen loads several files and shows one report each; a side-by-side comparison
-    table across games is the next step.
+11. ✅ Results page: drop several log `.json` files, compare modes (win spread, game length, survey answers).
+    Next step if wanted: charts across games (e.g. game length per mode), and reading survey free text side by side.
 12. Per-round one-tap question "did another crew change your cast?" (yes/no) stored in the log.
 13. Smarter bots (the "aware" bot from `Docs/Concept Rework/evidence/posted_up_test.py`) and a sim report per mode.
 
@@ -242,3 +245,26 @@ simulator before committing, and append to §6.
     after about 15 s, the bot took over and played on, the client rejoined, got the seat back and the bot
     stopped. The host then cut the connection, and the client's Reconnect button restored it.
 - Open: two real networks / phones (needs people); comparing several games side by side (C11).
+
+### 2026-10-31 · Claude Code (cloud, Opus 5.5) · A4 replay, C11 comparison
+- **A4 Replay:** `ui/replay.js` `buildReplay(log)`. A replay screen (from **Replay** on the end screen, or
+  **Replay this game** for a game log loaded under *Game stats*) has:
+  - start/end, round and step buttons, play/pause, a slider and arrow keys;
+  - "what just happened" (new log lines);
+  - every crew's hand;
+  - a warning if the replay ends differently from the saved result (the rules changed since).
+
+  The reveal flip and round summary work in the replay too. **Stats** in the replay's top bar shows the
+  stats up to the current step.
+- **C11 Comparison:** loading 2+ files adds a comparison at the top of the stats screen: one row per game, plus
+  per-mode averages (minutes, s/round, table total, margin, lead changes, comeback wins, wins by seat, fun).
+  Downloadable as .md or .csv. Survey answers are now part of each game's stats and report. Loading a game's
+  log and its .md report together counts as one game.
+- Verified:
+  - `npm test` (16 tests: replay rebuilds the same result, stops and rounds, divergence and bad-log errors;
+    the comparison groups games by mode and counts seat wins) and `node tools/simulate.mjs 50` pass.
+  - Playwright: replayed a finished game from the end screen (stepping, rounds, slider, keyboard, play) and
+    went back to the end screen. Loaded 2 logs plus 1 .md: the comparison showed 2 games (the duplicate was
+    merged), downloaded the comparison .csv, and replayed from a loaded file. Checked at 375 px. No console
+    errors.
+- Open: real-network and phone testing of A1. Section B (new modes/modifiers) is next in the backlog.

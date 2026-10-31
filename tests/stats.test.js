@@ -3,9 +3,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadData } from "../engine/load-node.js";
 import { createGame, act, botChoice, viewFor, replay, setSeatKind } from "../engine/game.js";
-import { Timer, computeStats, statsMarkdown, statsCsv, parseStatsFile } from "../ui/stats.js";
+import { Timer, computeStats, statsMarkdown, statsCsv, parseStatsFile, compareStats, compareMarkdown, compareCsv } from "../ui/stats.js";
+import { buildReplay } from "../ui/replay.js";
+import { playOut } from "../engine/run.js";
 
-const { data, modes } = loadData();
+const { data, modes, modifiers } = loadData();
 const bots = (n) => Array.from({ length: n }, () => ({ kind: "bot" }));
 
 // Plays a game with bots, one second per answer, watching every view like the UI does.
@@ -64,4 +66,34 @@ test("stats: numbers match the game, and the .md and log both load back", () => 
     assert.equal(csv.length, 1 + n * s.roundsPlayed);
   }
   assert.throws(() => parseStatsFile("hello"), /Not a Hood Sorcery/);
+});
+
+test("replay: a log rebuilds the same game, with stops at each finished step", () => {
+  const mods = [modifiers["call-out"]];
+  const setup = { mode: modes["posted-up"], modifiers: mods, seats: bots(3), seed: "replay" };
+  const st = playOut(setup, data);
+  const log = { setup: { modeId: "posted-up", modifiers: ["call-out"], seats: setup.seats, seed: "replay" }, actions: st.actions, result: st.result };
+  const rp = buildReplay(log, data, modes, modifiers);
+  assert.equal(rp.states.length, st.actions.length + 1);
+  assert.equal(JSON.stringify(rp.states.at(-1).result), JSON.stringify(st.result));
+  assert.equal(rp.diverged, false);
+  assert.equal(rp.stops[0], 0);
+  assert.equal(rp.stops.at(-1), st.actions.length);
+  assert.ok(rp.stops.every((k, i) => !i || k > rp.stops[i - 1]));
+  assert.deepEqual(Object.keys(rp.rounds).map(Number), Array.from({ length: st.mode.params.rounds }, (_, i) => i + 1));
+  assert.equal(buildReplay({ ...log, result: { ...st.result, order: [...st.result.order].reverse() } }, data, modes, modifiers).diverged, true);
+  assert.throws(() => buildReplay({ ...log, actions: null }, data, modes, modifiers), /no moves/);
+  assert.throws(() => buildReplay({ ...log, actions: [{ ...st.actions[0], value: "nonsense" }] }, data, modes, modifiers), /don't fit/);
+});
+
+test("compare: one row per game, averages and seat wins per mode", () => {
+  const list = [["classic", 4, "c1"], ["classic", 4, "c2"], ["corners", 3, "k1"]].map(([m, n, seed]) => computeStats({ ...timedGame(m, n, seed).rec, survey: { fun: "4" } }));
+  const c = compareStats(list);
+  assert.equal(c.games.length, 3);
+  assert.deepEqual(c.modes.map((m) => [m.mode, m.games]), [["Classic", 2], ["Corners", 1]]);
+  assert.equal(c.modes[0].seatWins.reduce((a, b) => a + b, 0), 2);
+  assert.equal(c.modes[0].fun, 4);
+  assert.match(compareMarkdown(c), /## By mode/);
+  assert.equal(compareCsv(c).trim().split("\n").length, 4);
+  assert.match(statsMarkdown(list[0]), /## Survey[\s\S]*Fun \(1–5\):\*\* 4/);
 });

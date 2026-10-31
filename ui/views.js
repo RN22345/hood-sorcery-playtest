@@ -92,12 +92,35 @@ export function clientLobby(app) {
   </section></main>`;
 }
 
-export function statsScreen(app, panels) {
+export function statsScreen(app, panels, compareHtml) {
   return `${topbar(app, "Game stats")}
   <main class="lobby statsview">
     <div class="row"><button data-act="statsBack">← Back to lobby</button><span class="muted small">${app.statsList.length} game${app.statsList.length > 1 ? "s" : ""}</span></div>
+    ${compareHtml ? `<section class="stats compare"><h2>${app.statsList.length} games compared</h2><div class="stats-md">${compareHtml}</div>
+      <div class="row"><button data-act="compareMd">Comparison (.md)</button><button data-act="compareCsv">Comparison (.csv)</button><span class="muted small">Each game's own report follows below.</span></div></section>` : ""}
     ${panels}
   </main>`;
+}
+
+// Replay controls (A4): step through a recorded game; every hand is visible.
+export function replayPanel(app, v, rp) {
+  const last = rp.stops.length - 1;
+  const b = (to, label, title, off) => `<button data-act="replayGo" data-to="${to}" title="${title}" ${off ? "disabled" : ""}>${label}</button>`;
+  const news = v.replayNew.filter((e) => e.k !== "round");
+  const hands = v.players.map((p) => `<div class="rhand"><span class="chip" style="--c:${p.color}">${esc(p.name)}</span>
+    <span class="mini">${(p.hand || []).map((id) => card(app.data.cardMap[id], { cls: "mini", tag: "span" })).join("")}</span></div>`).join("");
+  return `<div class="panel replay">
+    <div class="row">
+      ${b("start", "⏮", "Start", !rp.at)}${b("prevRound", "◀◀", "Previous round (shift + ←)", !rp.at)}${b("prev", "◀", "Previous step (←)", !rp.at)}
+      <button class="primary" data-act="replayPlay" title="Play / pause (space)">${rp.playing ? "⏸ Pause" : "▶ Play"}</button>
+      ${b("next", "▶", "Next step (→)", rp.at === last)}${b("nextRound", "▶▶", "Next round (shift + →)", rp.at === last)}${b("end", "⏭", "End", rp.at === last)}
+      <span class="muted small">Step ${rp.at}/${last} · round ${v.round}${v.over ? " · game over" : v.pending ? ` · next: ${esc(stepName(v.pending.step))}` : ""}</span>
+    </div>
+    <input type="range" class="seek" min="0" max="${last}" value="${rp.at}" data-act="replaySeek" aria-label="Replay position">
+    ${rp.diverged ? `<p class="err small">This replay ends differently from the saved result: the rules changed since the game was played.</p>` : ""}
+    <div class="replay-new">${rp.at ? (news.length ? news.map((e) => `<div class="lg ${e.k}">${esc(e.text)}</div>`).join("") : '<span class="muted">Answers locked in (hidden until everyone has answered).</span>') : '<span class="muted">Start of the game. Step forward with ▶ or the arrow keys.</span>'}</div>
+    <h3>Hands</h3><div class="rhands">${hands}</div>
+  </div>`;
 }
 
 export function topbar(app, sub) {
@@ -106,11 +129,12 @@ export function topbar(app, sub) {
     <nav>
       <button data-act="rules">Rules</button>
       ${app.screen === "game" ? `<button data-act="stats">Stats</button><button data-act="toggleLog">Log</button><button data-act="leave">Leave</button>` : ""}
+      ${app.screen === "replay" ? `<button data-act="stats">Stats</button><button data-act="toggleLog">Log</button><button data-act="replayClose">Close replay</button>` : ""}
     </nav></header>`;
 }
 
 // ------------------------------------------------------------------ game
-export function game(app, v) {
+export function game(app, v, opts = {}) {
   const { data } = app;
   const pl = v.players;
   const me = v.you != null ? pl[v.you] : null;
@@ -126,7 +150,7 @@ export function game(app, v) {
   const hot = app.revealing && sum?.round === app.revealing ? sum : null; // what changed in the round just flipped
   const players = `<div class="players">${pl.map((p) => playerBox(app, v, p, track, hot)).join("")}</div>`;
   const zones = `<div class="zones">${v.zones.map((z) => zoneBox(app, v, z, hot)).join("")}</div>`;
-  const body = summaryStrip(v, sum, hot) + (v.over ? endPanel(app, v) : actionPanel(app, v));
+  const body = summaryStrip(v, sum, hot) + (opts.panel || (v.over ? endPanel(app, v) : actionPanel(app, v)));
   const hand = me && me.hand ? handRow(app, v, me) : app.cover == null && app.localCount > 1 && !v.over ? `<div class="hand hidden-hand muted">Hands are hidden between turns (pass-and-play).</div>` : "";
   const log = app.showLog ? `<aside class="log">${logHtml(v)}</aside>` : "";
   const cover = app.cover != null ? coverScreen(app, v, sum) : "";
@@ -313,7 +337,7 @@ function endPanel(app, v) {
     <label class="q">A round where the choice was obvious (Flow)<textarea data-act="survey" data-k="obvious" rows="2">${esc(s.obvious)}</textarea></label>
     <label class="q">Did you change a cast because of another crew? How often?<textarea data-act="survey" data-k="reads" rows="2">${esc(s.reads)}</textarea></label>
     <label class="q">Fun, 1–5 <input data-act="survey" data-k="fun" value="${esc(s.fun)}" size="3"></label>
-    <div class="row"><button class="primary" data-act="download">Download game log (.json)</button><button class="primary" data-act="stats">Game stats</button><button data-act="leave">Back to lobby</button></div>
+    <div class="row"><button class="primary" data-act="download">Download game log (.json)</button><button class="primary" data-act="stats">Game stats</button>${app.role !== "client" ? `<button data-act="replay" data-i="cur">Replay</button>` : ""}<button data-act="leave">Back to lobby</button></div>
     <p class="muted small">Game stats: timing, economy and per-crew numbers, downloadable as a report (.md), a spreadsheet (.csv) or an image.</p>
   </div>`;
 }

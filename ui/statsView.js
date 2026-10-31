@@ -57,11 +57,11 @@ export function statsCard(s) {
 }
 
 /** HTML for one stats report: card, download buttons, then the readable tables. `i` indexes app.statsList. */
-export function statsPanel(s, i) {
+export function statsPanel(s, i, extra = "") {
   const report = statsMarkdown(s).split("<!--")[0].replace(/^# .*\n/, "");
   return `<section class="stats" data-stats="${i}">
     <div class="stats-card-wrap">${statsCard(s)}</div>
-    <div class="row">
+    <div class="row">${extra}
       <button data-act="statsMd" data-i="${i}">Report (.md)</button>
       <button data-act="statsCsv" data-i="${i}">Spreadsheet (.csv)</button>
       <button data-act="statsImg" data-i="${i}" data-type="image/png">Image (.png)</button>

@@ -43,6 +43,10 @@ against bots, or online with a room code. No install, no account, no server.
    margin, Wheel spread) and per-crew averages. Download it as a report (**.md**), a spreadsheet (**.csv**,
    one row per crew per round) or an image (**.png** / **.jpg**). To look at it again, in any tab: lobby →
    *Game stats* → load the `.md` or the game log `.json` (or drop several files), or pick a recent game.
+   Several games at once get a **comparison** (per mode: length, margin, lead changes, wins by seat, fun).
+9. **Replay:** on the end screen, or for any game log `.json` loaded under *Game stats*, press **Replay**
+   and step through the game with every hand visible (◀ ▶ step, ◀◀ ▶▶ round, slider, or the arrow keys;
+   space plays). Logs from a player who *joined* someone's room have no moves; use the host's log.
 
 Tips: the **seed** makes a game repeatable (same seed + same choices = same game). Bots let 1–2 testers run a
 full 4-crew table. The *Short game* modifier is for quick rules checks.

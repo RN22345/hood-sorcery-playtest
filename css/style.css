@@ -149,6 +149,12 @@ code { background: #000a; padding: 0 .3em; border-radius: 4px; }
 .stats-md h2 { margin-top: .8rem; }
 .file input { display: block; margin-top: .3rem; }
 
+/* replay (A4) */
+.replay .seek { width: 100%; accent-color: var(--gold); padding: 0; }
+.replay-new { font-size: .88rem; margin: .4rem 0; max-height: 180px; overflow: auto; }
+.rhands { display: grid; gap: .3rem; }
+.rhand { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+
 /* online connection strip (A1) */
 .netstrip { display: flex; flex-wrap: wrap; gap: .4rem .7rem; align-items: center; font-size: .85rem; padding: .35rem .7rem; border: 1px dashed var(--line); border-radius: var(--radius); }
 .conn::before { content: "●"; margin-right: .3rem; }
