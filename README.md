@@ -13,26 +13,39 @@ against bots, or online with a room code. No install, no account, no server.
 | **Hold the Block** | P2 | One Vein corner: the holder heals but the whole Street hits them. Stay or bail? |
 | **Posted Up** | P15 | Classic + pick a Spot each round; highest ATK takes it; the rich Spot heals; Spots pay at the end |
 
-**Modifiers:** Call Out (P16) · Pass the Tab (P12) · Specialist matrix · Forecast · 4 corners · Block heals 1 ·
-3 Thumbs · Short game (4 rounds).
+**Modifiers:** Call Out (P16) · Pass the Tab (P12) · Run It Up (P4) · Specialist matrix · Forecast · 4 corners ·
+Corner locations (P1) · Block corner (P1+P2) · Open first card (P1) · Rep upkeep · Block heals 1 · 3 Thumbs ·
+Short game (4 rounds).
+
+Built for a desktop browser at any size from 480p to 4K: the whole table always fits the window, with no
+scrolling. On a phone it switches to a scrolling layout. 🔊 mutes, ⚙ opens the settings. Music and sound
+effects are CC0 (credits in `assets/audio/CREDITS.md` and on the title screen).
 
 ---
 
 ## Quick guide
 
-1. **Open the link.** Pick a **mode**, tick any **modifiers**, and set each **seat**: *Human (this device)*, *Bot*
-   or *Online player*.
-2. **Same room, one device:** leave online seats out and press **Start on this device**. When it's a human's
-   turn the screen says *Pass the device to …*; only that player taps *show my hand*.
-3. **Online:** set some seats to *Online player*, press **Open online room**, and send friends the **room
-   code** (or the invite link). They open the same page, type a name and the code under *Join a friend's
-   room*. Start when every online seat shows ✔. If someone drops, they rejoin with the **same name**.
-4. **Playing a round:** the Wheel spins by itself. On your turn click a **zone** (Corners: a corner), then
-   click cards in your hand to add them to the line, in order. Click a card in the line to take it back.
-   **+ Thumbs** commits Trigger Thumbs. **Lock in** lights up when the line is legal.
-5. **Rules** (top right) shows the rules of the mode you're playing. **Log** shows every roll and result.
-6. **At the end:** fill in the 4-question survey and press **Download game log**. Send the `.json` to QA:
-   it holds the seed, every choice, the full log and the survey, and can be replayed exactly.
+1. **Open the link.** The title screen has **Play**, **Play online**, **Game stats**, **How to play** and
+   **Settings** (music, sound, how fast rounds play out, bot speed).
+2. **Play:** three steps. Pick a **mode** → set each **crew** to 🙂 Human (this device), 🤖 Bot or 🌐 Online →
+   tick any **house rules** → **Start game**. Every game gets a new random shuffle unless you turn *Random game*
+   off and type a seed. With several humans on one device, the screen says *Pass the device to …* between turns.
+3. **Your turn:** **drag cards** from your hand (the fan at the bottom) into your line, or onto a zone on the
+   table; drop them between other cards to change the order (order matters for seams ✦), drag them back to the
+   hand to take them out, or drag cards around your hand to sort it. Clicking works too. **+ Thumbs** commits
+   Trigger Thumbs; **Cast** lights up when the line is legal.
+4. **Then the table plays it out:** the cards flip, Trigger Thumb dice roll, totals and rank badges appear, each
+   corner/Spot changes hands with a flash, and damage or Rep floats up from each crew while the counters move. A
+   caption says what happened. **Skip** or change the speed at any time (Settings: slow / normal / fast /
+   instant; one crew at a time or all at once). The next round opens with the Wheel spinning.
+5. **Online:** *Play online* → **Host a table** (set seats to Online, open the room, share the **code** or the
+   invite link) or **Join a table** (name + code). During the game a strip shows who is connected; a dropped
+   player presses **Reconnect** and gets their seat back, and the host can let a **bot take over** meanwhile.
+6. **Rules** (top bar) explains the mode you're playing; **Log** shows every roll and result.
+7. **At the end:** the survey, **Game stats** (standings, chart, timing, economy; download as .md, .csv, .png or
+   .jpg), **Replay** (step through with every hand visible), **Play again**, and **Download log** (.json: seed,
+   every choice, log, timings, survey; replays exactly). Under *Game stats* on the title screen you can reopen
+   recent games, or load reports/logs (several at once are compared side by side).
 
 Tips: the **seed** makes a game repeatable (same seed + same choices = same game). Bots let 1–2 testers run a
 full 4-crew table. The *Short game* modifier is for quick rules checks.

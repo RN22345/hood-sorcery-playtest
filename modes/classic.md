@@ -40,3 +40,12 @@ Swap Meet (pass 2 left) · Flip the Script (keep or swap ATK/BLK) · The Turf (l
 Bleeding (last on ATK +1, last on BLK +1) · Cuffed (line 6) · Mugged (ATK ranks rotate) · Sabotage (BLK ranks rotate).
 
 **End:** least damage wins. Ties: less damage in the last round, then higher ATK + BLK in the last round, then a roll-off.
+
+## Run It Up (P4 modifier): playtest guesses (flagged)
+
+After casting and before the flip, every crew picks at once: **Fold**, **Call** or **Raise**.
+- **Stakes:** one raise doubles this round's matrix damage, two or more raises make it ×4.
+- **Fold:** you skip the ranking and take a flat **1 damage** (`foldCost`). The rest are ranked with the
+  matrix for their number (3- and 2-player matrices). If only one crew stays in, it takes nothing.
+- Bleeding, Thumb 6, Call Out and Pass the Tab apply as usual (Bleeding is not multiplied).
+- With naive bots, games end around **×2.5 the damage** of plain Classic: try a lower fold cost or ×2 max.

@@ -49,7 +49,7 @@ export default {
           const a = st.res[c.from].atk, b = st.res[c.to].blk;
           const loser = a > b ? c.to : c.from;
           st.players[loser].tracks.damage += 1;
-          st.log.push({ r: st.round, k: "callout", text: `${st.players[c.from].name} ATK ${a} vs ${st.players[c.to].name} BLK ${b}: ${a > b ? "lands" : "backfires"}, ${st.players[loser].name} +1 damage.` });
+          st.log.push({ r: st.round, k: "callout", pid: loser, d: 1, pids: [c.from, c.to], text: `${st.players[c.from].name} ATK ${a} vs ${st.players[c.to].name} BLK ${b}: ${a > b ? "lands" : "backfires"}, ${st.players[loser].name} +1 damage.` });
         }
         st.ext.callouts = [];
       },

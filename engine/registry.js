@@ -8,8 +8,12 @@ import postedUp from "./modules/postedUp.js";
 import callOut from "./modules/callOut.js";
 import passTheTab from "./modules/passTheTab.js";
 import forecast from "./modules/forecast.js";
+import locations from "./modules/locations.js";
+import blockCorner from "./modules/blockCorner.js";
+import openCard from "./modules/openCard.js";
+import runItUp from "./modules/runItUp.js";
 
-export const MODULES = { core, matrix, corners, holdTheBlock, postedUp, callOut, passTheTab, forecast };
+export const MODULES = { core, matrix, corners, holdTheBlock, postedUp, callOut, passTheTab, forecast, locations, blockCorner, openCard, runItUp };
 
 // Fixed round phases (MULTIMODE_PLAYTEST_PLAN.md §2.1). Modules hook into phases, never reorder them.
 export const PHASES = ["ROUND_START", "PRE_CAST", "CAST", "PRE_REVEAL", "REVEAL", "RESOLVE", "POST_RESOLVE", "REFILL", "ROUND_END"];

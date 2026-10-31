@@ -122,6 +122,19 @@ export function viewFor(st, data, pid) {
   return v;
 }
 
+/**
+ * Hand a seat to a bot or back to a human (host replaces a dropped online player). Not a rule and not an
+ * action: bots never touch the game rng, so the recorded actions still replay to the same game.
+ */
+export function setSeatKind(state, pid, kind) {
+  const pl = state.players[pid];
+  if (!pl || (kind !== "bot" && kind !== "human") || pl.kind === kind) return state;
+  const st = structuredClone(state);
+  st.players[pid].kind = kind;
+  st.log.push({ r: st.round, k: "seat", pid, text: kind === "bot" ? `${pl.name} dropped: a bot plays for them.` : `${pl.name} is back in control.` });
+  return st;
+}
+
 /** Rebuild a game from its setup and recorded actions (for logs, tests and the Unity vectors). */
 export function replay(setup, actions, data) {
   let st = createGame(setup, data);
