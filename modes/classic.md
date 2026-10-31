@@ -49,3 +49,14 @@ After casting and before the flip, every crew picks at once: **Fold**, **Call** 
   matrix for their number (3- and 2-player matrices). If only one crew stays in, it takes nothing.
 - Bleeding, Thumb 6, Call Out and Pass the Tab apply as usual (Bleeding is not multiplied).
 - With naive bots, games end around **×2.5 the damage** of plain Classic: try a lower fold cost or ×2 max.
+
+### Lead card (house rules *Show lead card* and *Lead card: hide ATK/BLK*, Classic only): playtest guesses
+
+Both switch Run It Up on. While the fold / call / raise pick is open, you also see the **first card of every rival's
+line** (the card leading it; order matters for seams, so this also hints at the seam order). The rest of their line stays
+face down; your own line is shown in full. *Show lead card*: the full card plus a "Lead: ATK a · BLK b · length" readout,
+so you have real numbers to bet on. *Lead card: hide ATK/BLK*: the number strip is covered ("ATK ? · BLK ?", and the
+tooltip omits them), so only name, elements and length are known. Ticking both means the hidden version. Lead cards are
+display info only (`viewFor` adds `lead` / `leadHide` during the pick); bots ignore them. Open: first card vs a chosen
+card, and whether other modes could use it (Posted Up has several Spots, so it's Classic-only for now).
+

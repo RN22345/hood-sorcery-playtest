@@ -50,6 +50,7 @@ export function modifierProblems(mode, m) {
   const out = [];
   const req = m.requires || {};
   if (req.track && mode.win.track !== req.track) out.push(`${m.name} needs a damage-scored mode`);
+  if (req.modes && !req.modes.includes(mode.id)) out.push(`${m.name} is for ${req.modes.join(", ")} only`);
   for (const id of req.modules || []) if (!mode.modules.includes(id)) out.push(`${m.name} needs ${id}`);
   return out;
 }

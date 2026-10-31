@@ -6,6 +6,7 @@ import { createGame, act, botChoice, viewFor, replay, setSeatKind } from "../eng
 import { Timer, computeStats, statsMarkdown, statsCsv, parseStatsFile, compareStats, compareMarkdown, compareCsv } from "../ui/stats.js";
 import { buildReplay } from "../ui/replay.js";
 import { playOut } from "../engine/run.js";
+import { modifierProblems } from "../engine/registry.js";
 
 const { data, modes, modifiers } = loadData();
 const bots = (n) => Array.from({ length: n }, () => ({ kind: "bot" }));
@@ -100,7 +101,7 @@ test("compare: one row per game, averages and seat wins per mode", () => {
 
 test("log deltas add up to every final score (the presenter's counters rely on it)", () => {
   for (const mode of Object.values(modes)) {
-    const ok = Object.values(modifiers).filter((m) => !(m.requires?.track && m.requires.track !== mode.win.track) && (m.requires?.modules || []).every((id) => mode.modules.includes(id)));
+    const ok = Object.values(modifiers).filter((m) => !modifierProblems(mode, m).length);
     for (const mods of [[], ok]) {
       const n = mode.players.at(-1);
       const st = playOut({ mode, modifiers: mods, seats: bots(n), seed: `deltas-${mode.id}-${mods.length}` }, data);

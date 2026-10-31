@@ -19,12 +19,14 @@ const chip = (p) => `<span class="chip" style="--c:${p.color}">${esc(p.name)}</s
 const unitOf = (track) => (track === "rep" ? "Rep" : "damage");
 const MODE_ART = { classic: "line", corners: "corner", "hold-the-block": "block", "posted-up": "tunnel" };
 
-export function card(c, { cls = "", tag = "button", style = "" } = {}) {
-  const title = `${c.name}: ${c.start} → ${c.end}, length ${c.len}, ATK ${c.atk}, BLK ${c.blk}`;
+export function card(c, { cls = "", tag = "button", style = "", hide = false } = {}) {
+  // hide: the lead-card "art only" option covers the ATK/BLK strip, so the tooltip must not give them away either
+  const title = hide ? `${c.name}: ${c.start} → ${c.end}, length ${c.len}` : `${c.name}: ${c.start} → ${c.end}, length ${c.len}, ATK ${c.atk}, BLK ${c.blk}`;
+  if (hide) cls += " lead-hide";
   const face = c.img
-    ? `<img src="${c.img}" alt="${esc(c.name)}" loading="lazy" draggable="false">`
+    ? `<img src="${c.img}" alt="${esc(c.name)}" draggable="false" onerror="if(!this.dataset.r){this.dataset.r=1;this.src='${c.img}?r='+Date.now()}">`
     : `<div class="card-text"><b>${esc(c.name)}</b>${el(c.start)}→${el(c.end)}<span>L${c.len} · A${c.atk} · B${c.blk}</span></div>`;
-  return `<${tag} class="card ${cls}" data-card="${c.id}" title="${esc(title)}" ${style ? `style="${style}"` : ""}>${face}<span class="card-stats">${el(c.start)}${el(c.end)} L${c.len} <b class="a">${c.atk}</b>/<b class="b">${c.blk}</b></span></${tag}>`;
+  return `<${tag} class="card ${cls}" data-card="${c.id}" title="${esc(title)}" ${style ? `style="${style}"` : ""}>${face}<span class="card-stats">${el(c.start)}${el(c.end)} L${c.len}${hide ? "" : ` <b class="a">${c.atk}</b>/<b class="b">${c.blk}</b>`}</span></${tag}>`;
 }
 const back = (cls = "mini") => `<span class="card ${cls} facedown"><img src="assets/card_back.webp" alt="" draggable="false"></span>`;
 const backs = (n) => `<span class="backs">${Array.from({ length: n }, (_, i) => `<img src="assets/card_back.webp" alt="" style="--i:${i}">`).join("")}</span>`;
@@ -425,8 +427,18 @@ function zoneBox(app, v, z, hot, holderIdNow) {
   const loc = z.loc ? LOCATIONS[z.loc] : null;
   const focus = show.cur?.zones?.includes(z.name);
   const lanes = v.players.map((p) => ({ p, ln: lineOf(p) })).filter((x) => x.ln);
+  const leadMode = !!v.lead && !v.revealed && !htb && v.zones.length === 1; // Run It Up + lead card (Classic)
   let body;
-  if (htb) {
+  if (leadMode) {
+    // the Run It Up pick: last round's lines are gone; you see your own line and each rival's first card
+    body = `<div class="zlines lead">${v.players.map((p) => {
+      const mine = p.id === v.you, ids = mine ? (v.casts?.[p.id]?.lines || []).flatMap((l) => l.cards) : v.lead[p.id] ? [v.lead[p.id]] : [];
+      const c0 = app.data.cardMap[ids[0]];
+      const read = !mine && c0 && !v.leadHide ? `<span class="zstat">Lead: A <b>${c0.atk}</b> B <b>${c0.blk}</b> · ${c0.len}f</span>` : mine ? '<span class="zstat">your line</span>' : "";
+      return `<div class="zline" data-k="ld${p.id}" style="--c:${p.color}"><div class="lhead"><span class="chip">${esc(p.name)}</span>${read}</div>
+        <div class="lcards">${ids.map((id) => card(app.data.cardMap[id], { cls: "mini", tag: "span", hide: !mine && v.leadHide })).join("")}${mine ? "" : `<span class="muted small hidden-more">+ hidden</span>`}</div></div>`;
+    }).join("")}</div>`;
+  } else if (htb) {
     // the Block is a duel: the holder sits apart from the Street, so roles are obvious at a glance
     const street = v.players.filter((p) => p.id !== holderId);
     body = `<div class="htb">
@@ -441,7 +453,7 @@ function zoneBox(app, v, z, hot, holderIdNow) {
     body = `<div class="zlines">${v.players.map((p) => `<div class="zline none" data-k="ln${p.id}" style="--c:${p.color}"><div class="lhead"><span class="chip">${esc(p.name)}</span></div><div class="lcards"><span class="muted">${pend?.done.includes(p.id) ? "✔ locked in" : pend?.who.includes(p.id) ? "casting…" : "waiting"}</span></div></div>`).join("")}</div>`;
   } else body = `<div class="zlines">${lanes.map(({ p, ln }) => lane(p, ln)).join("")}</div>`;
   return `<div class="zone art-${zoneArt(v, z)} ${z.rich ? "rich" : ""} ${z.extra ? "extra" : ""} ${taken ? "taken" : ""} ${focus ? "focus" : ""} ${lanes.length >= 4 ? "crowded" : ""}" data-zone="${esc(z.name)}" style="${holder ? `--h:${holder.color};` : ""}--lanes:${Math.max(2, lanes.length)}">
-    <div class="zhead"><b>${esc(z.name)}</b>${z.rich ? ' <span class="badge">★ rich</span>' : ""}
+    <div class="zhead"><b>${esc(z.name)}</b>${z.rich ? ' <span class="badge">★ rich</span>' : ""}${past && !leadMode && (lanes.length || htb) && res ? ' <span class="badge old">last round</span>' : ""}
       ${v.mode.id === "classic" || htb ? "" : `<span class="holder">${holder ? chip(holder) : '<span class="muted">unclaimed</span>'}</span>`}</div>
     ${loc ? `<div class="loc" title="${esc(loc.text)}"><img src="assets/locations/${z.loc}.svg" alt="" onerror="this.remove()"><b>${esc(loc.name)}</b> ${esc(loc.text)}</div>` : ""}
     ${posted.length && !v.revealed ? `<div class="posted">${posted.map(chip).join(" ")}</div>` : ""}

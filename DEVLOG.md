@@ -419,3 +419,16 @@ simulator before committing, and append to §6.
   settings and rules modals, no console errors.
 - Open: the lo-fi music doesn't fit the theme (ART_TODO); a real phone; the results pop-up for Corners shows the
   table only (no matrix there by design).
+
+### 2026-10-31 · Claude Code (cloud, Sonnet 5.5) · Small fixes from playtest: card art loading, "last round" tag
+- Card images no longer use `loading="lazy"`, retry once on error, and are preloaded at boot (a tester saw a broken
+  Stonewall card; the file itself is valid and drags fine here, so the cause is most likely a lazy or failed fetch).
+- Zones that still show the previous round's dimmed lines now carry a "last round" tag (it was confusing during
+  the Run It Up choice).
+- Verified: `npm test` (23), Playwright Classic rounds, tag appears from round 2, no console errors.
+- **Lead card (house rules, Classic only):** *Show lead card* and *Lead card: hide ATK/BLK* (both turn Run It Up on).
+  During the Run It Up pick you see each rival's first card (full card + readout, or number strip covered); the rest
+  stays hidden and last round's lines are replaced by the lead lanes. `viewFor` adds `lead` / `leadHide` only during
+  that pick. Decided with the team: first card of the line, show numbers by default, hide-numbers as a toggle, Classic
+  only. New `requires.modes` in `modifierProblems`; test added; tests now pick modifiers via `modifierProblems`.
+  Bots don't use lead cards yet. Hidden info online: clients get the lead card id (the hide option is display-only).
