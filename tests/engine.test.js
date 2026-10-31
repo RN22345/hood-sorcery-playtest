@@ -7,6 +7,7 @@ import { rankEntries } from "../engine/rank.js";
 import { createGame, act, viewFor, replay, makeCtx, botChoice } from "../engine/game.js";
 import { playOut } from "../engine/run.js";
 import { castProblem } from "../engine/cast.js";
+import { modifierProblems } from "../engine/registry.js";
 import { roundSummary } from "../engine/summary.js";
 import core from "../engine/modules/core.js";
 import { loadData } from "../engine/load-node.js";
@@ -114,7 +115,7 @@ test("cast validation: line limit and hand", () => {
 
 test("every mode and modifier plays to the end, deterministic, replayable", () => {
   for (const mode of Object.values(modes)) {
-    const ok = Object.values(modifiers).filter((m) => !(m.requires?.track && m.requires.track !== mode.win.track) && (m.requires?.modules || []).every((id) => mode.modules.includes(id)));
+    const ok = Object.values(modifiers).filter((m) => !modifierProblems(mode, m).length);
     for (const mods of [[], ok]) {
       for (const n of mode.players) {
         const setup = { mode, modifiers: mods, seats: bots(n), seed: `t-${mode.id}-${n}` };
@@ -230,4 +231,29 @@ test("run it up: folders skip the ranking and pay 1; one raise doubles the matri
   run(runItUp, "foldCost", st);
   // 3-player matrix for P1-P3: ATK ranks 0,1,2 ; BLK ranks 2,0,1 -> [0][2]=1, [1][0]=0, [2][1]=1 ; ×2 ; P4 folded +1
   assert.deepEqual(st.rd, [2, 0, 2, 1]);
+});
+
+test("lead card: only the first card of each line is visible during the Run It Up pick, and only then", () => {
+  const { data, modes, modifiers } = loadData();
+  for (const [ids, hide] of [[["lead-card"], false], [["lead-card-art"], true], [["lead-card", "lead-card-art"], true]]) {
+    let st = createGame({ mode: modes.classic, modifiers: ids.map((id) => modifiers[id]), seats: Array.from({ length: 4 }, (_, i) => ({ kind: i ? "bot" : "human" })), seed: "lead" }, data);
+    let seen = 0;
+    for (let k = 0; !st.over && k < 400; k++) {
+      const pid = st.pending.who.find((id) => !(id in st.pending.answers));
+      const v = viewFor(st, data, 0);
+      if (st.pending.step === "runItUp") {
+        seen++;
+        assert.deepEqual(Object.keys(v.lead).sort(), ["0", "1", "2", "3"]);
+        assert.equal(v.leadHide, hide);
+        for (const [id, c] of Object.entries(v.lead)) assert.equal(c, st.casts[id].lines[0].cards[0], "the lead card is the first card of the line");
+        assert.deepEqual(Object.keys(v.casts), ["0"], "other casts stay hidden");
+      } else assert.equal(v.lead, undefined, `no lead outside the pick (${st.pending.step})`);
+      st = act(st, data, { pid, value: botChoice(st, data, pid) }).state;
+    }
+    assert.ok(seen >= 4, "ran through the Run It Up pick every round");
+  }
+  // off by default and for other modes
+  const plain = createGame({ mode: modes.classic, modifiers: [modifiers["run-it-up"]], seats: Array.from({ length: 4 }, () => ({ kind: "bot" })), seed: "lead" }, data);
+  assert.equal(viewFor(plain, data, 0).lead, undefined);
+  assert.ok(modifierProblems(modes.corners, modifiers["lead-card"]).length, "Classic only");
 });

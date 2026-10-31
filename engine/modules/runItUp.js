@@ -15,7 +15,7 @@ export default {
     {
       id: "runItUp", phase: "PRE_REVEAL", order: 20, kind: "choice",
       spec: (st, ctx) => ({
-        type: "option", prompt: "Run It Up: your line is set. Fold, call, or raise the stakes?",
+        type: "option", prompt: `Run It Up: your line is set. ${ctx.p.leadCard ? "You can see each rival's lead card. " : ""}Fold, call, or raise the stakes?`,
         options: [
           { value: "fold", label: "Fold", hint: `Skip the ranking, take ${ctx.p.foldCost ?? 1} damage` },
           { value: "call", label: "Call", hint: "Play the round as it stands" },

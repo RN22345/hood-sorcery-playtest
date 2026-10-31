@@ -117,6 +117,12 @@ export function viewFor(st, data, pid) {
     v.pending.done = Object.keys(st.pending.answers).map(Number);
     v.pending.answers = pid in st.pending.answers ? { [pid]: st.pending.answers[pid] } : {};
   }
+  // Lead card (house rule): while the Run It Up pick is open, everyone may see the first card of every line.
+  // Display info only; the rest of the casts stay hidden until the flip.
+  if (st.mode.params.leadCard && st.pending?.step === "runItUp" && !st.revealed) {
+    v.lead = Object.fromEntries(Object.entries(st.casts).map(([id, c]) => [id, c.lines[0]?.cards[0]]).filter(([, c]) => c));
+    v.leadHide = !!st.mode.params.leadHideStats;
+  }
   v.you = pid;
   v.choice = pid == null ? null : choiceFor(st, data, pid);
   return v;

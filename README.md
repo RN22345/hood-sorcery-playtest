@@ -13,7 +13,7 @@ against bots, or online with a room code. No install, no account, no server.
 | **Hold the Block** | P2 | One Vein corner: the holder heals but the whole Street hits them. Stay or bail? |
 | **Posted Up** | P15 | Classic + pick a Spot each round; highest ATK takes it; the rich Spot heals; Spots pay at the end |
 
-**Modifiers:** Call Out (P16) · Pass the Tab (P12) · Run It Up (P4) · Specialist matrix · Forecast · 4 corners ·
+**Modifiers:** Call Out (P16) · Pass the Tab (P12) · Run It Up (P4) · Show lead card (P4, see a rival's first card before the bet) · Specialist matrix · Forecast · 4 corners ·
 Corner locations (P1) · Block corner (P1+P2) · Open first card (P1) · Rep upkeep · Block heals 1 · 3 Thumbs ·
 Short game (4 rounds).
 

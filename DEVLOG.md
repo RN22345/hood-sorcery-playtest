@@ -426,4 +426,9 @@ simulator before committing, and append to §6.
 - Zones that still show the previous round's dimmed lines now carry a "last round" tag (it was confusing during
   the Run It Up choice).
 - Verified: `npm test` (23), Playwright Classic rounds, tag appears from round 2, no console errors.
-- Open (design, not built): show opponents' lead card before the Run It Up choice (see the discussion; needs a rule decision).
+- **Lead card (house rules, Classic only):** *Show lead card* and *Lead card: hide ATK/BLK* (both turn Run It Up on).
+  During the Run It Up pick you see each rival's first card (full card + readout, or number strip covered); the rest
+  stays hidden and last round's lines are replaced by the lead lanes. `viewFor` adds `lead` / `leadHide` only during
+  that pick. Decided with the team: first card of the line, show numbers by default, hide-numbers as a toggle, Classic
+  only. New `requires.modes` in `modifierProblems`; test added; tests now pick modifiers via `modifierProblems`.
+  Bots don't use lead cards yet. Hidden info online: clients get the lead card id (the hide option is display-only).

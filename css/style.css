@@ -301,6 +301,9 @@ body.fit .zones { container-type: size; }
 .loc { display: flex; align-items: center; gap: .35em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .66em; color: var(--ink2); background: #000000aa; border-left: 3px solid var(--gold); padding: .15em .45em; margin-bottom: .3em; border-radius: 4px; }
 .loc img { width: 26px; height: 26px; flex-shrink: 0; }
 .loc b { color: var(--gold2); }
+.card.lead-hide::after { content: "ATK ? · BLK ?"; position: absolute; left: 0; right: 0; bottom: 0; height: 36%; display: grid; place-items: center; border-radius: 0 0 6px 6px;
+  background: linear-gradient(#241b2e, #120d17); color: var(--ink2); font: 700 .5em "Noto Sans", sans-serif; letter-spacing: .04em; text-align: center; }
+.hidden-more { align-self: center; margin-left: .4em; }
 .badge.old { background: #ffffff1f; color: var(--ink2); font-weight: 400; letter-spacing: .06em; text-transform: uppercase; }
 .badge { background: var(--gold); color: #1b1408; border-radius: 99px; padding: 0 .45em; font-size: .75em; font-weight: 700; }
 .chip { display: inline-block; border-radius: 99px; padding: 0 .55em; background: color-mix(in srgb, var(--c) 30%, #000a); border: 1px solid var(--c); font-size: .8em; white-space: nowrap; }
