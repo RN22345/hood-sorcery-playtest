@@ -192,6 +192,15 @@ in `registry.js` (`rounds 8, hand 8, thumbs 2, line 8, maxCards 3`).
 - **Finals ruleset (team, 2026-11-01):** Corners first, Classic second; the Unity port follows that order. Modes may
   still be added, changed or removed, so keep everything as modules + data.
 
+- **GP2 = Corners expansion for the tabletop (team, 2026-11-01):** two engine pieces for it. `physicalDeck` param
+  (modifier `physical-deck`, group `tabletop`, hidden in the web lobby): a cast may name any real card, Swap Meet is a
+  log reminder instead of a pick, refill only removes cards that were in the hand (no change for normal games). Hands
+  in state are then only used by bots/tests. `hotCorner` module (modifier `hot-corner`): one random corner per round
+  pays `hotRep` (+1) via the `zoneRep` hook; bots ignore it. Not checked together with *Open first card* (it uses the hand).
+- **Never add a step to an existing module lightly:** `botRng` seeds from `st.stepIdx`, so a new step in `core` shifts
+  every bot choice and changes every recorded vector. Fold new behaviour into an existing step, or put it in a new
+  module that is only loaded by a modifier.
+
 ### Hosting: is GitHub Pages enough?
 
 Yes, for this stage. Pages serves static files, and the site is static: the game logic runs in the host
@@ -448,3 +457,11 @@ simulator before committing, and append to §6.
   in `hood-sorcery-unity` must pass them. Re-run the exporter after any rule change.
 - Verified: `npm test` (25, new cooldown test), `node tools/simulate.mjs 50`, site loads locally with no console errors.
 - Open: the Wheel UI doesn't grey out cooled sectors yet.
+
+### 2026-11-01 · Claude Code (desktop, Opus 5.5) · GP2 engine: physical deck + hot corner
+- `physical-deck` and `hot-corner` modifiers (see §4), `engine/modules/hotCorner.js`, `cast.js`/`core.js` changes, the hot
+  corner uses the existing gold "rich" zone style. Vectors: 220 (192 unchanged, 28 new for the two modifiers).
+- Verified: `npm test` 27 (2 new), `node tools/simulate.mjs` with both modifiers, lobby shows Hot corner and hides
+  Physical deck, the hot zone is highlighted in a Corners game, no console errors.
+- Open: a visible "HOT" label on the zone; bots that aim for the hot corner.
+

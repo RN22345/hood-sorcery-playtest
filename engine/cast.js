@@ -24,7 +24,8 @@ export function castProblem(st, ctx, pid, v, limits = st.limits) {
     if (zonesUsed.has(ln.zone)) return "Only one line per zone";
     zonesUsed.add(ln.zone);
     for (const id of ln.cards) {
-      if (!pl.hand.includes(id)) return "That card isn't in your hand";
+      // physicalDeck (GP2 tabletop expansion): cards are real; the app only records which ones were played
+      if (ctx.p.physicalDeck ? !ctx.card(id) : !pl.hand.includes(id)) return ctx.p.physicalDeck ? "Unknown card" : "That card isn't in your hand";
       if (used.has(id)) return "A card can only be cast once";
       used.add(id);
     }

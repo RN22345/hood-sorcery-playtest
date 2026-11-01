@@ -273,3 +273,38 @@ test("wheel cooldown: a sector sits out the next 3 spins; 0 turns it off", () =>
   }
   assert.ok(repeats > 0, "without cooldown, back-to-back repeats happen");
 });
+
+test("physical deck (GP2): any real card may be cast, Swap Meet happens at the table, refill only touches the hand", () => {
+  const st = createGame({ mode: modes.classic, modifiers: [modifiers["physical-deck"]], seats: bots(4), seed: "phys" }, data);
+  const ctx = makeCtx(st, data);
+  const notMine = data.cards.find((c) => st.players.every((p) => !p.hand.includes(c.id)) && c.len === 2).id;
+  assert.equal(castProblem(st, ctx, 0, { lines: [{ zone: 0, cards: [notMine] }], thumbs: [] }), null);
+  assert.equal(castProblem(st, ctx, 0, { lines: [{ zone: 0, cards: ["HS3-P999"] }], thumbs: [] }), "Unknown card");
+  const normal = createGame({ mode: modes.classic, seats: bots(4), seed: "phys" }, data);
+  assert.equal(castProblem(normal, makeCtx(normal, data), 0, { lines: [{ zone: 0, cards: [notMine] }], thumbs: [] }), "That card isn't in your hand");
+  // a whole game: humans' casts name cards outside the hand; hands never change, the deck never shrinks
+  const deck0 = st.deck.length;
+  let s = st;
+  for (let guard = 0; !s.over && guard < 500; guard++) {
+    const pid = s.pending.who.find((id) => !(id in s.pending.answers));
+    assert.notEqual(s.pending.step, "swapMeet");
+    const value = s.pending.step === "cast" ? { lines: [{ zone: 0, cards: [notMine] }], thumbs: [] } : botChoice(s, data, pid);
+    const r = act(s, data, { pid, value });
+    assert.equal(r.error, undefined);
+    s = r.state;
+  }
+  assert.ok(s.over);
+  assert.equal(s.deck.length, deck0);
+  if (s.log.some((e) => e.k === "wheel" && e.id === "SWAP_MEET")) assert.ok(s.log.some((e) => e.k === "swap" && /at the table/.test(e.text)));
+});
+
+test("hot corner (GP2): one hot corner every round, its holder gets +hotRep", () => {
+  const st = playOut({ mode: modes.corners, modifiers: [modifiers["hot-corner"]], seats: bots(4), seed: "hot" }, data);
+  const hots = st.log.filter((e) => e.k === "hot");
+  assert.equal(hots.length, 8);
+  const s2 = fakeState("corners", { 0: { lines: [{ zone: 0, atk: 3, blk: 1 }] }, 1: { lines: [{ zone: 1, atk: 0, blk: 0 }] }, 2: { lines: [{ zone: 2, atk: 0, blk: 0 }] }, 3: { lines: [{ zone: 2, atk: 0, blk: 0 }] } }, { mods: ["hot-corner"] });
+  for (const z of s2.zones) z.hot = z.i === 0;
+  run(corners, "corners", s2);
+  assert.equal(s2.zones[0].holder, 0);
+  assert.equal(s2.players[0].tracks.rep, 2); // 1 for the corner + 1 hot
+});

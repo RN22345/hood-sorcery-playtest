@@ -452,7 +452,7 @@ function zoneBox(app, v, z, hot, holderIdNow) {
     const pend = show.busy ? null : v.pending;
     body = `<div class="zlines">${v.players.map((p) => `<div class="zline none" data-k="ln${p.id}" style="--c:${p.color}"><div class="lhead"><span class="chip">${esc(p.name)}</span></div><div class="lcards"><span class="muted">${pend?.done.includes(p.id) ? "✔ locked in" : pend?.who.includes(p.id) ? "casting…" : "waiting"}</span></div></div>`).join("")}</div>`;
   } else body = `<div class="zlines">${lanes.map(({ p, ln }) => lane(p, ln)).join("")}</div>`;
-  return `<div class="zone art-${zoneArt(v, z)} ${z.rich ? "rich" : ""} ${z.extra ? "extra" : ""} ${taken ? "taken" : ""} ${focus ? "focus" : ""} ${lanes.length >= 4 ? "crowded" : ""}" data-zone="${esc(z.name)}" style="${holder ? `--h:${holder.color};` : ""}--lanes:${Math.max(2, lanes.length)}">
+  return `<div class="zone art-${zoneArt(v, z)} ${z.rich || z.hot ? "rich" : ""} ${z.extra ? "extra" : ""} ${taken ? "taken" : ""} ${focus ? "focus" : ""} ${lanes.length >= 4 ? "crowded" : ""}" data-zone="${esc(z.name)}" style="${holder ? `--h:${holder.color};` : ""}--lanes:${Math.max(2, lanes.length)}">
     <div class="zhead"><b>${esc(z.name)}</b>${z.rich ? ' <span class="badge">★ rich</span>' : ""}${past && !leadMode && (lanes.length || htb) && res ? ' <span class="badge old">last round</span>' : ""}
       ${v.mode.id === "classic" || htb ? "" : `<span class="holder">${holder ? chip(holder) : '<span class="muted">unclaimed</span>'}</span>`}</div>
     ${loc ? `<div class="loc" title="${esc(loc.text)}"><img src="assets/locations/${z.loc}.svg" alt="" onerror="this.remove()"><b>${esc(loc.name)}</b> ${esc(loc.text)}</div>` : ""}

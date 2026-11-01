@@ -48,11 +48,14 @@ export default {
         st.fx = ctx.cfg.wheel[sector.id] || sector.effect;
         applyLimits(st, ctx);
         st.log.push({ r: st.round, k: "wheel", id: sector.id, text: `The Wheel lands on ${sector.name}.` });
+        // With a physical deck the swap happens at the table; the app only reminds the crews. (No extra step: adding steps
+        // shifts st.stepIdx, which seeds the bots, and would change every recorded game.)
+        if (st.fx === "swapPass" && ctx.p.physicalDeck) st.log.push({ r: st.round, k: "swap", text: "Swap Meet: everyone passes 2 cards face down to the left, at the table." });
       },
     },
     {
       id: "swapMeet", phase: "PRE_CAST", order: 10, kind: "choice",
-      when: (st) => st.fx === "swapPass",
+      when: (st, ctx) => st.fx === "swapPass" && !ctx.p.physicalDeck,
       spec: (st) => ({ type: "pickCards", count: 2, prompt: "Swap Meet: pick 2 cards to pass to the left." }),
       validate(st, ctx, pid, v) {
         const hand = st.players[pid].hand;
@@ -166,7 +169,8 @@ export default {
       run(st, ctx) {
         for (const pl of st.players) {
           const cast = st.casts[pl.id];
-          const used = cast ? cast.lines.flatMap((l) => l.cards) : [];
+          // only cards that were in the hand (a physical-deck cast may name any card; normal casts always come from the hand)
+          const used = cast ? cast.lines.flatMap((l) => l.cards).filter((id) => pl.hand.includes(id)) : [];
           pl.hand = pl.hand.filter((id) => !used.includes(id));
           st.discard.push(...used);
         }
