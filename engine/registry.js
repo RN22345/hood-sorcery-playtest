@@ -18,7 +18,7 @@ export const MODULES = { core, matrix, corners, holdTheBlock, postedUp, callOut,
 // Fixed round phases (MULTIMODE_PLAYTEST_PLAN.md §2.1). Modules hook into phases, never reorder them.
 export const PHASES = ["ROUND_START", "PRE_CAST", "CAST", "PRE_REVEAL", "REVEAL", "RESOLVE", "POST_RESOLVE", "REFILL", "ROUND_END"];
 
-export const DEFAULT_PARAMS = { rounds: 8, hand: 8, thumbs: 2, line: 8, maxCards: 3, minCards: 1, matrixSet: "standard" };
+export const DEFAULT_PARAMS = { rounds: 8, hand: 8, thumbs: 2, line: 8, maxCards: 3, minCards: 1, matrixSet: "standard", wheelCooldown: 3 };
 
 /**
  * @param mode       a data/modes/*.json object

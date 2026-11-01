@@ -257,3 +257,19 @@ test("lead card: only the first card of each line is visible during the Run It U
   assert.equal(viewFor(plain, data, 0).lead, undefined);
   assert.ok(modifierProblems(modes.corners, modifiers["lead-card"]).length, "Classic only");
 });
+
+test("wheel cooldown: a sector sits out the next 3 spins; 0 turns it off", () => {
+  for (let g = 0; g < 40; g++) {
+    const st = playOut({ mode: modes.classic, seats: bots(4), seed: `cool-${g}` }, data);
+    const spins = st.log.filter((e) => e.k === "wheel").map((e) => e.id);
+    assert.equal(spins.length, 8);
+    spins.forEach((id, i) => assert.ok(!spins.slice(Math.max(0, i - 3), i).includes(id), `${spins} at ${i}`));
+  }
+  let repeats = 0;
+  for (let g = 0; g < 40; g++) {
+    const spins = playOut({ mode: modes.classic, modifiers: [modifiers["wheel-no-cooldown"]], seats: bots(4), seed: `cool-${g}` }, data)
+      .log.filter((e) => e.k === "wheel").map((e) => e.id);
+    repeats += spins.some((id, i) => i && spins[i - 1] === id) ? 1 : 0;
+  }
+  assert.ok(repeats > 0, "without cooldown, back-to-back repeats happen");
+});

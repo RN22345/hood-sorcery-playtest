@@ -37,7 +37,13 @@ export default {
     {
       id: "spin", phase: "ROUND_START", order: 10, kind: "auto",
       run(st, ctx) {
-        const sector = ctx.data.wheel[Math.floor(rand(st) * ctx.data.wheel.length)];
+        // Cooldown (team decision 2026-11-01): a sector that landed sits out the next `wheelCooldown` spins,
+        // so repeats can't cluster. 0 = every sector every spin (the physical Wheel).
+        const hist = (st.wheelHist ||= []);
+        const cool = ctx.p.wheelCooldown ? hist.slice(-ctx.p.wheelCooldown) : [];
+        const pool = ctx.data.wheel.filter((w) => !cool.includes(w.id));
+        const sector = pool[Math.floor(rand(st) * pool.length)];
+        st.wheelHist.push(sector.id);
         st.wheel = sector.id;
         st.fx = ctx.cfg.wheel[sector.id] || sector.effect;
         applyLimits(st, ctx);

@@ -24,7 +24,8 @@ const store = {
   get(k, d) { try { return JSON.parse(localStorage.getItem("hsp:" + k)) ?? d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem("hsp:" + k, JSON.stringify(v)); } catch {} },
 };
-const newSeed = () => Math.random().toString(36).slice(2, 8);
+// Fresh OS randomness per game (team decision 2026-11-01); the seed is still logged so a game can be replayed.
+const newSeed = () => crypto.getRandomValues(new Uint32Array(2)).reduce((t, n) => t + n.toString(36), "").slice(0, 10);
 const BOT_MS = { slow: 1100, normal: 650, fast: 250 };
 
 const app = {

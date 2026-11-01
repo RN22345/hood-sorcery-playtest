@@ -186,6 +186,12 @@ in `registry.js` (`rounds 8, hand 8, thumbs 2, line 8, maxCards 3`).
   `roundSummary`. Settings: closes itself / wait for a click / off.
 - Final-standings roll-off uses a d6 plus a hidden tiebreak digit so it never loops; the log shows the d6.
 
+- **Wheel cooldown (team, 2026-11-01):** a sector that landed sits out the next 3 spins (`wheelCooldown`, default 3;
+  house rule *Wheel without cooldown* sets 0). Seeds come from `crypto.getRandomValues`. Saved logs from before this
+  change replay with different Wheel results (the engine draws from a smaller pool).
+- **Finals ruleset (team, 2026-11-01):** Corners first, Classic second; the Unity port follows that order. Modes may
+  still be added, changed or removed, so keep everything as modules + data.
+
 ### Hosting: is GitHub Pages enough?
 
 Yes, for this stage. Pages serves static files, and the site is static: the game logic runs in the host
@@ -233,7 +239,7 @@ Sized so a cloud session can take them one by one. ✅ = done.
 13. Smarter bots (the "aware" bot from `Docs/Concept Rework/evidence/posted_up_test.py`) and a sim report per mode.
 
 **D. Toward Unity / GP2**
-14. Export **test vectors** (`tests/vectors/*.json`: setup + actions + expected result) from `replay`, for the
+14. ✅ Export **test vectors** (`tests/vectors/*.json`: setup + actions + expected result) from `replay`, for the
     C# port to pass.
 15. "Tabletop entry" adapter (GP2 shape): crews type ATK/BLK/length instead of casting cards; the engine does the rest.
 16. Port order for C#: `line` → `rank` + matrix + Wheel → chosen mode modules → choices → net.
@@ -432,3 +438,13 @@ simulator before committing, and append to §6.
   that pick. Decided with the team: first card of the line, show numbers by default, hide-numbers as a toggle, Classic
   only. New `requires.modes` in `modifierProblems`; test added; tests now pick modifiers via `modifierProblems`.
   Bots don't use lead cards yet. Hidden info online: clients get the lead card id (the hide option is display-only).
+
+### 2026-11-01 · Claude Code (desktop, Opus 5.5) · Wheel cooldown, OS-random seeds, test vectors for Unity
+- Wheel: 3-spin cooldown in `core.js` spin step (`st.wheelHist`), param `wheelCooldown` in `DEFAULT_PARAMS`, new
+  house rule `wheel-no-cooldown`. Lobby seeds now from `crypto.getRandomValues`. Why: playtesters saw Cuffed / Swap Meet
+  repeat; the RNG was fair (12.4–12.9% per sector over 5,000 games) but back-to-back repeats hit ~61% of games.
+- Backlog D14 done: `tools/export_vectors.mjs` writes 192 vectors (every mode × each valid single modifier × player
+  counts × 2 seeds) to `tests/vectors/`: setup by ids, all actions, expected wheel spins, scores and order. The C# port
+  in `hood-sorcery-unity` must pass them. Re-run the exporter after any rule change.
+- Verified: `npm test` (25, new cooldown test), `node tools/simulate.mjs 50`, site loads locally with no console errors.
+- Open: the Wheel UI doesn't grey out cooled sectors yet.
