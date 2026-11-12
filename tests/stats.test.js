@@ -102,7 +102,7 @@ test("compare: one row per game, averages and seat wins per mode", () => {
 test("log deltas add up to every final score (the presenter's counters rely on it)", () => {
   for (const mode of Object.values(modes)) {
     const ok = Object.values(modifiers).filter((m) => !modifierProblems(mode, m).length);
-    for (const mods of [[], ok]) {
+    for (const mods of [[], ok.filter((m) => m.id !== "physical-deck"), ok.filter((m) => m.group !== "experiment")]) { // experiments exclude the physical deck
       const n = mode.players.at(-1);
       const st = playOut({ mode, modifiers: mods, seats: bots(n), seed: `deltas-${mode.id}-${mods.length}` }, data);
       const sum = st.players.map(() => 0);

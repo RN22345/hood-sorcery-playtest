@@ -15,7 +15,7 @@ against bots, or online with a room code. No install, no account, no server.
 
 **Modifiers:** Call Out (P16) · Pass the Tab (P12) · Run It Up (P4) · Show lead card (P4, see a rival's first card before the bet) · Specialist matrix · Forecast · 4 corners ·
 Corner locations (P1) · Block corner (P1+P2) · Open first card (P1) · Rep upkeep · Block heals 1 · 3 Thumbs ·
-Short game (4 rounds).
+Short game (4 rounds) · **Experiments** (off by default): The Plug · Turf Perks · Contraband (see `modes/corners.md`).
 
 Built for a desktop browser at any size from 480p to 4K: the whole table always fits the window, with no
 scrolling (the crews are a slim scoreboard on the left; the line, the lanes of cast cards and your hand get the

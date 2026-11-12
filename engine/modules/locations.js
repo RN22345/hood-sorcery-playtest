@@ -3,6 +3,7 @@
 // modes/corners.md "Playtest guesses" for the readings).
 import { shuffle } from "../rng.js";
 import { lineStats } from "../line.js";
+import { limitsFor } from "../cast.js";
 
 export const LOCATIONS = {
   laundromat: { name: "Laundromat", text: "Water seams here give +2 BLK instead of +1." },
@@ -27,7 +28,7 @@ export default {
   validateCast(st, ctx, pid, v) {
     for (const l of v.lines) if (l.cards?.length > 1 && locOf(st, l.zone) === "rooftop") return "The Rooftop takes only 1 card";
     const fingers = v.lines.reduce((a, l) => a + (l.cards?.length ? lineStats(l.cards.map(ctx.card)).len : 0), 0) + gratePenalty(st, ctx, v);
-    if (gratePenalty(st, ctx, v) && fingers > st.limits.line) return `Seams don't count at the Subway Grate: your lines are ${fingers} fingers (limit ${st.limits.line})`;
+    if (gratePenalty(st, ctx, v) && fingers > limitsFor(st, ctx, pid, v).line) return `Seams don't count at the Subway Grate: your lines are ${fingers} fingers (limit ${limitsFor(st, ctx, pid, v).line})`;
     return null;
   },
   adjustLine(st, ctx, pid, ln) {

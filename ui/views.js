@@ -9,6 +9,8 @@
 import { lineStats } from "../engine/line.js";
 import { roundSummary } from "../engine/summary.js";
 import { LOCATIONS } from "../engine/modules/locations.js";
+import { PERKS } from "../engine/modules/turfPerks.js";
+import { ITEMS } from "../engine/modules/contraband.js";
 import { audioSettings } from "./fx.js";
 import { resFor } from "./beats.js";
 
@@ -128,7 +130,7 @@ function setupCrews(app) {
     <div class="crew-row">${seats}${add}</div>`;
 }
 
-const RULE_GROUPS = [["twist", "Round twists", "change what happens when lines flip"], ["length", "Game length and Thumbs", ""], ["mode", "Only for this mode", "tied to the corner, block or spot rules"]];
+const RULE_GROUPS = [["twist", "Round twists", "change what happens when lines flip"], ["length", "Game length and Thumbs", ""], ["mode", "Only for this mode", "tied to the corner, block or spot rules"], ["experiment", "Experiments", "optional and unfinished: try them and tell us what breaks"]];
 
 function setupRules(app) {
   const { lob, modes, modifiers, net, data } = app;
@@ -389,7 +391,9 @@ function playerBox(app, v, p, track, hot, holderId) {
   const holdsTxt = holderId == null && holds.length ? `<span class="holds">Holds ${holds.map((z) => esc(z.name)).join(", ")}</span>` : "";
   const at = p.at != null && v.mode.zones.castInto === "chosen" ? `<span>At <b>${esc(v.zones[p.at]?.name)}</b></span>` : "";
   const totals = shown ? `<span class="tot"><b class="a">${shown.atk}</b>/<b class="b">${shown.blk}</b></span>` : r ? `<span class="totals">A <b>${r.atk}</b> B <b>${r.blk}</b></span>` : "";
-  const extra = [isHolder ? '<span class="crown">👑 HOLDER</span>' : "", holdsTxt, at, totals, rank].filter(Boolean).join("");
+  const perks = Object.entries(v.perks || {}).filter(([, pid]) => pid === p.id).map(([loc]) => `<span class="perk" title="${esc(PERKS[loc].text)}">★ ${esc(PERKS[loc].name)}</span>`).join("");
+  const pocket = v.itemCounts ? (isMe && v.items?.[p.id] ? `<span class="pocket" title="${esc(v.items[p.id].map((id) => ITEMS[id].name).join(", ") || "empty")}">🎒 ${v.items[p.id].length}</span>` : `<span class="pocket" title="Secret items">🎒 ${v.itemCounts[p.id] ?? 0}</span>`) : "";
+  const extra = [isHolder ? '<span class="crown">👑 HOLDER</span>' : "", holdsTxt, perks, pocket, at, totals, rank].filter(Boolean).join("");
   return `<div class="pbox ${isMe ? "me" : ""} ${isHolder ? "holder" : ""} ${mine.length ? "changed" : ""} ${deciding && !done ? "thinking" : ""} ${focus ? "focus" : ""}" data-pid="${p.id}" style="--c:${p.color}">
     <img class="standee" src="${p.img}" alt="">
     <div class="pinfo">
@@ -455,7 +459,7 @@ function zoneBox(app, v, z, hot, holderIdNow) {
   return `<div class="zone art-${zoneArt(v, z)} ${z.rich || z.hot ? "rich" : ""} ${z.extra ? "extra" : ""} ${taken ? "taken" : ""} ${focus ? "focus" : ""} ${lanes.length >= 4 ? "crowded" : ""}" data-zone="${esc(z.name)}" style="${holder ? `--h:${holder.color};` : ""}--lanes:${Math.max(2, lanes.length)}">
     <div class="zhead"><b>${esc(z.name)}</b>${z.rich ? ' <span class="badge">★ rich</span>' : ""}${past && !leadMode && (lanes.length || htb) && res ? ' <span class="badge old">last round</span>' : ""}
       ${v.mode.id === "classic" || htb ? "" : `<span class="holder">${holder ? chip(holder) : '<span class="muted">unclaimed</span>'}</span>`}</div>
-    ${loc ? `<div class="loc" title="${esc(loc.text)}"><img src="assets/locations/${z.loc}.svg" alt="" onerror="this.remove()"><b>${esc(loc.name)}</b> ${esc(loc.text)}</div>` : ""}
+    ${loc ? `<div class="loc" title="${esc(loc.text)}"><img src="assets/locations/${z.loc}.svg" alt="" onerror="this.remove()"><b>${esc(loc.name)}</b> ${v.perks && PERKS[z.loc] ? `<span class="perk" title="${esc(PERKS[z.loc].text)}">★ ${esc(PERKS[z.loc].name)}</span> ` : ""}${esc(loc.text)}</div>` : ""}
     ${posted.length && !v.revealed ? `<div class="posted">${posted.map(chip).join(" ")}</div>` : ""}
     ${opened.length && !v.revealed ? `<div class="opened">${opened.map((p) => `<span class="zline">${chip(p)} ${card(app.data.cardMap[v.open[p.id].card], { cls: "mini", tag: "span" })}<small class="muted">opened</small></span>`).join("")}</div>` : ""}
     ${body}
@@ -534,7 +538,13 @@ function actionPanel(app, v, holderId) {
     const pend = v.pending;
     if (!pend) return `<div class="panel muted">…</div>`;
     const waiting = pend.who.filter((id) => !pend.done.includes(id)).map((id) => v.players[id]);
-    return `<div class="panel waiting"><span class="muted">${esc(stepName(pend.step))}:</span> waiting for ${waiting.map(chip).join(" ")}<span class="dots3"><i>.</i><i>.</i><i>.</i></span>${err}</div>`;
+    return `<div class="panel waiting"><span class="muted">${esc(stepName(pend.step))}:</span> waiting for ${waiting.map(chip).join(" ")}<span class="dots3"><i>.</i><i>.</i><i>.</i></span>${marketStrip(app, v)}${err}</div>`;
+  }
+  if (c.type === "option" && (c.plug || c.wash)) return marketChoice(app, v, c, err);
+  if (c.type === "option" && c.respin) {
+    const sec = app.data.wheel.find((w) => w.id === c.wheel);
+    return `<div class="panel choice respin" data-k="${app.draft.key}">${sec ? `<img class="rs-img" src="${sec.img}" alt="">` : ""}<div class="rs-body"><p class="prompt">${esc(c.prompt)}</p>
+      <div class="opts">${c.options.map((o, i) => `<button class="opt ${o.value === "keep" ? "" : "special"}" data-act="opt" data-i="${i}"><b>${esc(o.label)}</b>${o.hint ? `<small>${esc(o.hint)}</small>` : ""}</button>`).join("")}</div>${err}</div></div>`;
   }
   if (c.type === "option") {
     return `<div class="panel choice" data-k="${app.draft.key}"><p class="prompt">${esc(c.prompt)}</p>
@@ -548,6 +558,38 @@ function actionPanel(app, v, holderId) {
   }
   if (c.type === "cast") return castPanel(app, v, c, err, holderId);
   return "";
+}
+
+// The Plug (picks) and the Laundromat's Wash: the cards are the buttons.
+function marketChoice(app, v, c, err) {
+  const cards = c.options.map((o, i) => ({ o, i })).filter(({ o }) => app.data.cardMap[o.value]);
+  const rest = c.options.map((o, i) => ({ o, i })).filter(({ o }) => !app.data.cardMap[o.value]);
+  const order = c.plug && v.plug?.order ? `<small class="muted"> Order: ${v.plug.order.map((id, k) => `<span class="${k === v.plug.i ? "now" : ""}">${esc(v.players[id].name)}</span>`).join(" → ")}</small>` : "";
+  return `<div class="panel choice market-panel ${c.wash ? "wash" : "plug"}" data-k="${app.draft.key}"><p class="prompt">${esc(c.prompt)}${order}</p>
+    <div class="market-row">${cards.map(({ o, i }) => `<button class="opt cardopt" data-act="opt" data-i="${i}" title="${esc(o.label)}">${card(app.data.cardMap[o.value], { tag: "span", cls: "market" })}</button>`).join("")}
+    <div class="market-side">${rest.map(({ o, i }) => `<button class="opt" data-act="opt" data-i="${i}"><b>${esc(o.label)}</b></button>`).join("")}</div></div>${err}</div>`;
+}
+
+// The Plug's face-up cards, for the crews that are waiting for their turn.
+function marketStrip(app, v) {
+  if (v.pending?.step !== "plugPick" || !v.plug?.cards?.length) return "";
+  return `<div class="market-row waiting-market">${v.plug.cards.map((id) => card(app.data.cardMap[id], { tag: "span", cls: "market sm" })).join("")}</div>`;
+}
+
+// Contraband: the item tray under the line builder. The item is part of the cast, so it stays hidden until the flip.
+function itemTray(app, v, c) {
+  if (!c.items?.length && !c.itemNote) return "";
+  const d = app.draft, it = d.item;
+  const def = it && ITEMS[it.id];
+  const lineZones = Object.keys(d.lines).filter((z) => d.lines[z]?.length).map(Number);
+  const sub = !def ? "" : def.needs === "zone"
+    ? `<span class="item-sub">at ${lineZones.length ? lineZones.map((zi) => `<button class="seg ${it.zone === zi ? "on" : ""}" data-act="itemZone" data-zone="${zi}">${esc(v.zones.find((z) => z.i === zi)?.name)}</button>`).join("") : '<small class="muted">cast a line first</small>'}</span>`
+    : def.needs === "rival"
+      ? `<span class="item-sub">name ${v.players.filter((p) => p.id !== v.you).map((p) => `<button class="seg ${it.target === p.id ? "on" : ""}" data-act="itemTarget" data-pid="${p.id}" style="--c:${p.color}">${esc(p.name)}</button>`).join("")}</span>` : "";
+  return `<div class="items"><span class="items-title">🎒 Contraband <small class="muted">one a round · hidden until the flip</small></span>
+    ${c.items.map((x) => `<button class="item ${it?.id === x.id ? "on" : ""}" data-act="itemPick" data-id="${x.id}" title="${esc(x.text)}"><b>${esc(x.name)}</b><small>${esc(x.text)}</small></button>`).join("")}
+    ${it ? `<button class="item none" data-act="itemPick" data-id="">No item</button>` : ""}
+    ${c.itemNote ? `<small class="muted">${esc(c.itemNote)}</small>` : ""}${sub}</div>`;
 }
 
 // Hold the Block: say which side you are on, every round, right where you build your line.
@@ -575,17 +617,21 @@ function castPanel(app, v, c, err, holderId) {
   const used = Object.values(d.lines).flat();
   const fingers = Object.values(d.lines).reduce((a, ids) => a + lineStats(ids.map((id) => app.data.cardMap[id])).len, 0);
   const me = v.players[v.you];
-  const pct = Math.min(100, (fingers / c.limits.line) * 100);
+  const lim = (d.item && c.limitsByItem?.[d.item.id]) || c.limits;
+  const pct = Math.min(100, (fingers / lim.line) * 100);
+  const peek = v.look?.hand && v.look.pid === v.you && !v.revealed
+    ? `<div class="peek">👁 Lookout: <b>${esc(v.players[v.look.target].name)}</b>'s hand ${v.look.hand.map((id) => card(app.data.cardMap[id], { cls: "mini", tag: "span" })).join("")}</div>` : "";
   return `<div class="panel choice cast" data-k="${app.draft.key}"><p class="prompt">${roleBanner(v, holderId)}${esc(c.prompt)} <span class="muted">Drag cards into ${zones.length > 1 ? "a zone" : "your line"}; drag them back to undo.</span></p>
     <div class="castrow">
       <div class="slots s${zones.length}">${slots}</div>
       <div class="meter">
-        <div class="fingers ${fingers > c.limits.line ? "bad" : ""}"><span>Fingers <b>${fingers}</b>/${c.limits.line}</span><i style="width:${pct}%"></i></div>
-        <span>Cards <b class="${used.length > c.limits.maxCards ? "bad" : ""}">${used.length}</b>/${c.limits.maxCards}</span>
+        <div class="fingers ${fingers > lim.line ? "bad" : ""}"><span>Fingers <b>${fingers}</b>/${lim.line}</span><i style="width:${pct}%"></i></div>
+        <span>Cards <b class="${used.length > lim.maxCards ? "bad" : ""}">${used.length}</b>/${lim.maxCards}</span>
         ${c.noThumbs ? "" : `<span class="thumbctl">Thumbs <button data-act="thumbDel" ${!d.thumbs.length ? "disabled" : ""}>−</button><b>${d.thumbs.length}</b><button data-act="thumbAdd" ${d.thumbs.length >= Math.min(2, me.thumbs) ? "disabled" : ""}>+</button><small class="muted">${me.thumbs} left</small></span>`}
         <div class="row"><button data-act="clear">Clear</button><button class="primary big" data-act="lock" ${app.castProblem ? "disabled" : ""}>${c.step === "openCard" ? "Open it" : "Cast"}</button></div>
       </div>
     </div>
+    ${itemTray(app, v, c)}${peek}
     ${app.castProblem && used.length ? `<p class="muted small hint">${esc(app.castProblem)}</p>` : ""}${err}
   </div>`;
 }
@@ -610,7 +656,7 @@ function coverScreen(app, v, sum) {
     <button class="primary big" data-act="unlock" data-pid="${p.id}">I'm ${esc(p.name)}: show my hand</button></div></div>`;
 }
 
-const STEP_NAMES = { cast: "casting", swapMeet: "Swap Meet", flipScript: "Flip the Script", postUp: "posting up", stayBail: "stay or bail", callOut: "call-outs", passTab: "the Tab", openCard: "opening a card", runItUp: "Run It Up" };
+const STEP_NAMES = { respin: "the Wheel", plugPick: "The Plug", lookout: "the Lookout", wash: "the Wash", cast: "casting", swapMeet: "Swap Meet", flipScript: "Flip the Script", postUp: "posting up", stayBail: "stay or bail", callOut: "call-outs", passTab: "the Tab", openCard: "opening a card", runItUp: "Run It Up" };
 export const stepName = (s) => STEP_NAMES[s] || s;
 
 function endPanel(app, v) {

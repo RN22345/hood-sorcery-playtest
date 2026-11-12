@@ -13,8 +13,12 @@ import blockCorner from "./modules/blockCorner.js";
 import openCard from "./modules/openCard.js";
 import runItUp from "./modules/runItUp.js";
 import hotCorner from "./modules/hotCorner.js";
+import respin from "./modules/respin.js";
+import plug from "./modules/plug.js";
+import turfPerks from "./modules/turfPerks.js";
+import contraband from "./modules/contraband.js";
 
-export const MODULES = { core, matrix, corners, holdTheBlock, postedUp, callOut, passTheTab, forecast, locations, blockCorner, openCard, runItUp, hotCorner };
+export const MODULES = { core, matrix, corners, holdTheBlock, postedUp, callOut, passTheTab, forecast, locations, blockCorner, openCard, runItUp, hotCorner, respin, plug, turfPerks, contraband };
 
 // Fixed round phases (MULTIMODE_PLAYTEST_PLAN.md §2.1). Modules hook into phases, never reorder them.
 export const PHASES = ["ROUND_START", "PRE_CAST", "CAST", "PRE_REVEAL", "REVEAL", "RESOLVE", "POST_RESOLVE", "REFILL", "ROUND_END"];
@@ -32,7 +36,7 @@ export function resolveMode(mode, modifiers = [], players = 4) {
   const modules = ["core", ...mode.modules];
   let params = { ...DEFAULT_PARAMS, ...mode.params };
   for (const m of modifiers) {
-    errors.push(...modifierProblems(mode, m));
+    errors.push(...modifierProblems(mode, m, modifiers));
     for (const id of m.modules || []) if (!modules.includes(id)) modules.push(id);
     params = { ...params, ...m.params };
   }
@@ -47,12 +51,14 @@ export function resolveMode(mode, modifiers = [], players = 4) {
 }
 
 /** Why a modifier can't be ticked for this mode ([] = fine). Used by the lobby to grey options out. */
-export function modifierProblems(mode, m) {
+export function modifierProblems(mode, m, ticked = []) {
   const out = [];
   const req = m.requires || {};
   if (req.track && mode.win.track !== req.track) out.push(`${m.name} needs a damage-scored mode`);
   if (req.modes && !req.modes.includes(mode.id)) out.push(`${m.name} is for ${req.modes.join(", ")} only`);
   for (const id of req.modules || []) if (!mode.modules.includes(id)) out.push(`${m.name} needs ${id}`);
+  // experiments can't be combined with some other modifiers (e.g. the physical deck has no hands to draw from)
+  for (const o of ticked) if (o.id !== m.id && (req.excludes || []).includes(o.id)) out.push(`${m.name} can't be combined with ${o.name}`);
   return out;
 }
 

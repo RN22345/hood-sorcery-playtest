@@ -107,10 +107,23 @@ The printed rules authority is **SRD v3.10.20**; the modes here are playtest var
 | blockCorner | `modules/blockCorner.js` | P1+P2: the first corner is The Block, +1 Rep to its holder |
 | openCard | `modules/openCard.js` | P1 signal: open one card + corner before casting; it must lead that line |
 | runItUp | `modules/runItUp.js` | P4: fold / call / raise after casting; stakes ×2/×4; folders skip the matrix |
+| plug | `modules/plug.js` | experiment, Corners + Classic: 4 face-up cards at Refill, picked worst-off first (Rep / damage), pass allowed |
+| turfPerks | `modules/turfPerks.js` | experiment, Corners: the corner holder at round start gets its location's perk (Wash, Lookout, Badge, Back Way, Confession) |
+| contraband | `modules/contraband.js` | experiment, Corners: 2 secret one-shot items per crew (12 kinds), one a round, committed with the cast |
+| respin | `modules/respin.js` | helper loaded by Turf Perks / Contraband: the shared "keep or re-spin" prompt right after the spin |
 
 Module hooks (all optional): `init`, `steps`, `effects`, `validateCast`, `botCast`, `adjustBotCast`,
-`castPrefill`, `adjustLine` (after a line's stats, before Thumbs), and for Corners `zoneRep`, `challengerTies`,
-`contestLost`. Bot casts always pass through `repairCast` (cast.js), so a module's extra limits never stall a bot.
+`castPrefill`, `adjustLine` (after a line's stats, before Thumbs), and for Corners `zoneRep`, `challengerTies(st,ctx,z,pid)`,
+`contestLost`. **Experiment hooks (2026-11-12, all behaviour-neutral when unused; the C# port mirrors each one 1:1):**
+`limitsFor(st,ctx,pid,limits,cast)` (per-crew limits; `cast.js limitsFor` returns the same `st.limits` object when nothing
+changes), `immune(st,ctx,pid,fx,cast)` (Badge, Bribe; `cast.js immune`), `castSpec(st,ctx,pid,spec)` (extra fields in the
+cast choice), `finishBotCast(st,ctx,pid,cast)` (after every `adjustBotCast`; Contraband picks its item here),
+`redactView(st,v,pid)` (hidden items, Lookout), `respinOptions(st,ctx,pid)` / `respinUsed(st,ctx,pid,value)` (the `respin`
+step), and for Corners `holderFor(st,ctx,z)` (Fake ID), `contestWon(st,ctx,z,winner,pids)` (Snitch) and
+`afterContests(st,ctx,out,lost)` (Getaway Car, The Plug's tally), called once after all contests and Mugged.
+Core exports `spinWheel(st,ctx,{respin})`, `discardUsed(st,ctx)` (sets `st.usedOut`; core refill then skips its discard)
+and `drawable(st,ctx)` (reshuffle if the deck is empty). A cast may carry `item: {id, zone?, target?}`; `cleanCast` keeps
+it only when present. `requires.excludes: [modifier ids]` greys out a combination. Bot casts always pass through `repairCast` (cast.js), so a module's extra limits never stall a bot.
 
 ## 3. How to…
 
@@ -200,6 +213,36 @@ in `registry.js` (`rounds 8, hand 8, thumbs 2, line 8, maxCards 3`).
 - **Never add a step to an existing module lightly:** `botRng` seeds from `st.stepIdx`, so a new step in `core` shifts
   every bot choice and changes every recorded vector. Fold new behaviour into an existing step, or put it in a new
   module that is only loaded by a modifier.
+
+- **Experiments: The Plug, Turf Perks, Contraband (2026-11-12, from `GP3_OVERHAUL_PLAN.md` §0, §0.3a, §4a).** Three optional
+  modifiers in the new group `experiment` (off by default). Contraband is retired in the SRD (D-32): here it is an experiment
+  only. Changed from the `12_Player_Choices.md` §7 draft: **Lookout** shows a *hand* (lines are built at the same time), **Burner
+  Phone** = +1 card (same reason), **Back Way** = +1 to your *total* finger limit, **Confession** = once per game per crew.
+  Readings the plan did not cover, all flagged in `modes/corners.md` "Playtest guesses":
+  - **Re-spin is its own step** (`respin` module, ROUND_START 11), asked right after the spin to every crew that holds a
+    re-spin (Lucky Charm, Confession); both answers are hidden and simultaneous. One re-spin a round: Lucky Charm first, then the
+    lowest seat; the others keep theirs. The first `wheel` log line stays; the re-spin logs `respin`. The cooldown history entry
+    is replaced and the sector that was spun can't come up. Lucky Charm counts as the round's one item.
+  - **Item shape:** `cast.item = { id, zone? , target? }` (zone for Fake ID / Brass Knuckles / Kevlar Hoodie, a rival for Snitch);
+    consumed at the flip (`itemReveal`, REVEAL −1). Items are dealt from the 12 without repeats (4 crews hold 8 of them).
+    The public log never names a stolen item.
+  - **Immunity:** Badge covers Cuffed and Mugged; Bribe covers every curse (Cuffed, Mugged, Sabotage, Bleeding). Mugged on an
+    immune crew: nothing happens (an `immune` log line, no fallback). Sabotage: an immune *holder* keeps its ties.
+  - **Fake ID:** the user counts as holder at that corner and defends with BLK; the real holder fights as a challenger. With no
+    other line there, the Fake ID user simply takes it.
+  - **Smoke Bomb:** only changes ties between a challenger and the holder (the holder already wins them); it does not beat
+    Sabotage or Old Church when the *holder* plays it.
+  - **Snitch** costs 1 Rep per contested corner (2+ crews with a line there) the named crew wins, after Mugged.
+  - **Getaway Car:** the lost line with the most ATK moves to the best-paying empty corner (nobody holds it after the contests),
+    lowest corner on a tie; it takes it with ATK 1+. The line is re-filed under the new corner in `st.res`.
+  - **Pickpocket** takes a random item from a random rival's unused items (engine RNG), after the items played this round are
+    revealed; the thief can use it from next round on.
+  - **The Plug:** 4 cards, picks one crew at a time (`"repeat"`), Corners ties by contests lost this round counted after
+    Mugged (`afterContests`) then a logged roll-off; Classic ties by damage this round. No market in the last round. Bots take
+    the card that raises their best line (ATK+BLK) by at least 0.5, else pass.
+  - **Turf Perks** use the holder *at the start of the round* (`st.perks`). **Wash** runs after the used cards leave the hand.
+  - Not allowed with `physical-deck` (new `requires.excludes`). Hooks are neutral: no new steps, log lines or RNG draws in a game
+    that does not load the modules, so all 220 older vectors are unchanged.
 
 ### Hosting: is GitHub Pages enough?
 
@@ -465,3 +508,21 @@ simulator before committing, and append to §6.
   Physical deck, the hot zone is highlighted in a Corners game, no console errors.
 - Open: a visible "HOT" label on the zone; bots that aim for the hot corner.
 
+### 2026-11-12 · Claude Code (desktop, Sonnet 5.5) · S1a: The Plug, Turf Perks, Contraband (experiments) + engine hooks
+- Built (branch `experiments`): the neutral hooks of `GP3_OVERHAUL_PLAN.md` §4a (see §2 "Experiment hooks"); modules `plug`, `turfPerks`,
+  `contraband` and the helper `respin`; three modifiers in the group `experiment`; bots for every new decision (Plug pick or pass,
+  Wash, Lookout target, item choice incl. Burner Phone / Extra Hand re-plans, re-spin on a curse); `finishBotCast` and `castSpec` hooks
+  (not in the plan: Contraband must pick its item *after* openCard has moved the cards, and the cast spec needs per-item limits).
+- Web UI: lobby group *Experiments*; Plug / Wash picks as clickable cards (the market is also shown to waiting crews); the re-spin
+  prompt with the sector; the item tray under the line builder (hidden until the flip, per-item limits, corner / rival picker);
+  the Lookout hand strip; perk badges on crews and corners, a pocket counter per crew; an item banner in the narrated round and the
+  re-spin as a second Wheel reel.
+- Tests: `tests/experiments.test.js` (23 tests: every item, every perk, the Plug orders and ties, re-spin rules, hidden info,
+  200 seeded bot games per experiment + replay, combos with four corners / open card / Block / hot corner). Vectors: 262 (220 old
+  unchanged, 42 new incl. 3 combination sets). The two "every modifier at once" tests now skip combinations the new `excludes` forbids.
+- Verified: `npm test` 50 pass; `node tools/simulate.mjs 50` clean; 200 games × each experiment (Plug also in Classic), no stall; in the
+  browser (local static server) each experiment on: lobby, item pick + lock-in + reveal banner, Plug picks, Wash, Lookout, re-spin
+  prompt (Lucky Charm), no console errors. Bot sweep (200 games, 4p Corners): average Rep 6.0 plain, 6.2 Plug, 6.8 Turf Perks,
+  6.3 Contraband; Classic + Plug damage 7.0 vs 6.9 (so the Plug barely moves a bot game).
+- Open: the C# port (S1b); the replay screen and the online (peer) flow were not tried with the experiments (they only read views and logs);
+  bots ignore the information from Lookout; Unity UI for all three is S3. Not tried on a phone or online (peer) with a client.

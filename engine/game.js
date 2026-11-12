@@ -123,6 +123,8 @@ export function viewFor(st, data, pid) {
     v.lead = Object.fromEntries(Object.entries(st.casts).map(([id, c]) => [id, c.lines[0]?.cards[0]]).filter(([, c]) => c));
     v.leadHide = !!st.mode.params.leadHideStats;
   }
+  const ctx = makeCtx(st, data);
+  for (const m of ctx.mods) m.redactView?.(st, v, pid); // hidden items, the Lookout's peek
   v.you = pid;
   v.choice = pid == null ? null : choiceFor(st, data, pid);
   return v;

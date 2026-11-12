@@ -647,3 +647,33 @@ body.flow .log { max-height: 240px; }
 body.flow .end-grid { grid-template-columns: 1fr; }
 body.flow .standings td:last-child { display: none; }
 body.flow .statsview .stats { grid-template-columns: 1fr; }
+
+/* ---- experiments: The Plug / Wash market, re-spin prompt, Contraband tray, perks, Lookout */
+.market-row { display: flex; flex-wrap: wrap; gap: .55em; align-items: flex-end; }
+.market-panel .opt.cardopt { min-width: 0; padding: .3em; background: #120d17; border: 2px solid var(--line2); border-radius: 12px; align-items: center; transition: transform .15s, border-color .15s, box-shadow .15s; }
+.market-panel .opt.cardopt:hover { transform: translateY(-8px) rotate(-1.5deg); border-color: var(--gold); box-shadow: 0 0 22px #e8b64a66; }
+.market-panel.plug .opt.cardopt { animation: fadeUp .35s ease-out both; }
+.card.market { width: 112px; cursor: pointer; }
+.card.market .card-stats { font-size: .72em; }
+.market-panel.wash .card.market { width: 82px; }
+.card.market.sm { width: 64px; cursor: default; }
+.market-side { display: flex; flex-direction: column; gap: .4em; margin-left: .6em; align-self: center; }
+.prompt .now { color: var(--gold2); font-weight: 700; }
+.waiting-market { margin-left: .8em; }
+.panel.respin { display: flex; gap: 1em; align-items: center; }
+.panel.respin .rs-img { height: 112px; border-radius: 10px; box-shadow: 0 0 18px #0009; }
+.panel.respin .rs-body { flex: 1; }
+.opt.special { border-color: var(--purple); background: linear-gradient(#2d2147, #1d1630); box-shadow: 0 0 14px #a26bff44; }
+.items { display: flex; flex-wrap: wrap; gap: .4em .5em; align-items: stretch; margin-top: .5em; padding-top: .5em; border-top: 1px dashed var(--line2); }
+.items-title { align-self: center; font-weight: 700; color: var(--gold2); margin-right: .4em; }
+.item { display: flex; flex-direction: column; align-items: flex-start; text-align: left; max-width: 250px; padding: .3em .7em; border-radius: 10px; border: 1px solid var(--line2); background: #1d1624; }
+.item small { color: var(--ink2); font-size: .68em; line-height: 1.2; }
+.item.on { border-color: var(--purple); background: linear-gradient(#34265a, #22183c); box-shadow: 0 0 16px #a26bff66; }
+.item.none { align-self: center; opacity: .8; }
+.item-sub { display: inline-flex; align-items: center; gap: .3em; align-self: center; font-size: .85em; }
+.item-sub .seg { border-radius: 8px; border: 1px solid var(--line2); }
+.perk { display: inline-block; background: linear-gradient(#34265a, #22183c); border: 1px solid var(--purple); color: #e6d9ff; border-radius: 99px; padding: 0 .55em; font-size: .72em; font-weight: 700; letter-spacing: .02em; }
+.loc .perk { margin: 0 .3em; }
+.pocket { font-size: .78em; color: var(--ink2); background: #00000066; border-radius: 99px; padding: 0 .5em; }
+.peek { display: flex; flex-wrap: wrap; align-items: center; gap: .25em; margin-top: .45em; padding: .3em .6em; border-radius: 10px; background: #1b2540; border: 1px solid #5b9be8; font-size: .85em; }
+.peek .card.mini { width: 40px; }

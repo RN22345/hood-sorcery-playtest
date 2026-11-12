@@ -7,6 +7,7 @@
 //   numbers and the score counter moves · end -> winner banner · anything else -> a caption.
 // No rules here; the structured fields (d, ds, zone, holder, ranks, id) come from the engine's log.
 import { banner, wheelReel, floatText, flash, dice, sound } from "./fx.js";
+import { ITEMS } from "../engine/modules/contraband.js";
 import { buildBeats, resFor } from "./beats.js";
 
 const SPEED = { slow: 1.5, normal: 1, fast: 0.5 };
@@ -129,6 +130,7 @@ export class Presenter {
       setTimeout(() => { if (this.cur === b) { this.disp.wheel = b.id; this.h.render(); } }, 1550);
     }
     if (b.type === "say" && b.sfx) sound(b.sfx);
+    if (b.type === "item") { banner(ITEMS[b.item]?.name || "Item", `${v.players[b.pid]?.name} plays it`, { color: v.players[b.pid]?.color, ms: 1300, cls: "small" }); sound("select"); flash(box(b.pid), v.players[b.pid]?.color || "#888", 900); }
     if (b.type === "reveal") { sound("flip"); setTimeout(() => sound("flip", { rate: 1.1 }), 260); setTimeout(() => sound("flip", { rate: 0.95 }), 520); }
     if (b.type === "dice") for (const pid of b.pids) dice(box(pid), (resFor(v, b.round)?.[pid]?.rolls || []).map((x) => x.r));
     if (b.type === "totals") sound("chip");

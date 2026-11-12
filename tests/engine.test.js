@@ -116,7 +116,7 @@ test("cast validation: line limit and hand", () => {
 test("every mode and modifier plays to the end, deterministic, replayable", () => {
   for (const mode of Object.values(modes)) {
     const ok = Object.values(modifiers).filter((m) => !modifierProblems(mode, m).length);
-    for (const mods of [[], ok]) {
+    for (const mods of [[], ok.filter((m) => m.id !== "physical-deck"), ok.filter((m) => m.group !== "experiment")]) { // experiments exclude the physical deck
       for (const n of mode.players) {
         const setup = { mode, modifiers: mods, seats: bots(n), seed: `t-${mode.id}-${n}` };
         const a = playOut(setup, data), b = playOut(setup, data);

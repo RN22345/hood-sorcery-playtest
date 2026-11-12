@@ -2,7 +2,7 @@
 // damage (Thumb 6), refill, end of game. Every mode includes this module.
 import { rand, d6 } from "../rng.js";
 import { lineStats, clamp } from "../line.js";
-import { castProblem, cleanCast, bestLine, botThumbs, botRng, repairCast } from "../cast.js";
+import { castProblem, cleanCast, bestLine, botThumbs, botRng, repairCast, limitsFor } from "../cast.js";
 
 const names = (st, pids) => pids.map((id) => st.players[id].name).join(", ");
 
@@ -12,6 +12,54 @@ export function applyLimits(st, ctx) {
     const e = m.effects?.[st.fx];
     if (e) Object.assign(st.limits, e);
   }
+}
+
+/**
+ * Spin the Wheel (also the re-spin of Lucky Charm / Confession). Cooldown (team decision 2026-11-01): a sector that
+ * landed sits out the next `wheelCooldown` spins, so repeats can't cluster; 0 = every sector every spin (the physical
+ * Wheel). A re-spin REPLACES this round's history entry, and the sector it replaces can't come up again.
+ */
+export function spinWheel(st, ctx, { respin = false } = {}) {
+  const hist = (st.wheelHist ||= []);
+  const base = respin ? hist.slice(0, -1) : hist;
+  const cool = ctx.p.wheelCooldown ? base.slice(-ctx.p.wheelCooldown) : [];
+  const pool = ctx.data.wheel.filter((w) => !cool.includes(w.id) && !(respin && w.id === st.wheel));
+  const sector = pool[Math.floor(rand(st) * pool.length)];
+  if (respin) hist[hist.length - 1] = sector.id; else hist.push(sector.id);
+  st.wheel = sector.id;
+  st.fx = ctx.cfg.wheel[sector.id] || sector.effect;
+  applyLimits(st, ctx);
+  st.log.push(respin
+    ? { r: st.round, k: "respin", id: sector.id, text: `Re-spin: the Wheel now lands on ${sector.name}.` }
+    : { r: st.round, k: "wheel", id: sector.id, text: `The Wheel lands on ${sector.name}.` });
+  return sector;
+}
+
+/** Used cards leave the hands for the discard. Idempotent within a refill (sets st.usedOut). */
+export function discardUsed(st, ctx) {
+  if (st.usedOut) return;
+  for (const pl of st.players) {
+    const cast = st.casts[pl.id];
+    // only cards that were in the hand (a physical-deck cast may name any card; normal casts always come from the hand)
+    const used = cast ? cast.lines.flatMap((l) => l.cards).filter((id) => pl.hand.includes(id)) : [];
+    pl.hand = pl.hand.filter((id) => !used.includes(id));
+    st.discard.push(...used);
+  }
+  st.usedOut = true;
+}
+
+/** Make sure the deck has a card on top (reshuffling the discards if needed). False if there is nothing left to draw. */
+export function drawable(st, ctx) {
+  if (!st.deck.length) {
+    if (!st.discard.length) return false;
+    st.deck = st.discard.splice(0);
+    for (let i = st.deck.length - 1; i > 0; i--) {
+      const j = Math.floor(rand(st) * (i + 1));
+      [st.deck[i], st.deck[j]] = [st.deck[j], st.deck[i]];
+    }
+    st.log.push({ r: st.round, k: "shuffle", text: "The deck ran out: discards shuffled back in." });
+  }
+  return true;
 }
 
 export function zoneLabel(st, z) {
@@ -37,17 +85,7 @@ export default {
     {
       id: "spin", phase: "ROUND_START", order: 10, kind: "auto",
       run(st, ctx) {
-        // Cooldown (team decision 2026-11-01): a sector that landed sits out the next `wheelCooldown` spins,
-        // so repeats can't cluster. 0 = every sector every spin (the physical Wheel).
-        const hist = (st.wheelHist ||= []);
-        const cool = ctx.p.wheelCooldown ? hist.slice(-ctx.p.wheelCooldown) : [];
-        const pool = ctx.data.wheel.filter((w) => !cool.includes(w.id));
-        const sector = pool[Math.floor(rand(st) * pool.length)];
-        st.wheelHist.push(sector.id);
-        st.wheel = sector.id;
-        st.fx = ctx.cfg.wheel[sector.id] || sector.effect;
-        applyLimits(st, ctx);
-        st.log.push({ r: st.round, k: "wheel", id: sector.id, text: `The Wheel lands on ${sector.name}.` });
+        spinWheel(st, ctx);
         // With a physical deck the swap happens at the table; the app only reminds the crews. (No extra step: adding steps
         // shifts st.stepIdx, which seeds the bots, and would change every recorded game.)
         if (st.fx === "swapPass" && ctx.p.physicalDeck) st.log.push({ r: st.round, k: "swap", text: "Swap Meet: everyone passes 2 cards face down to the left, at the table." });
@@ -76,7 +114,9 @@ export default {
       spec(st, ctx, pid) {
         // a module may pre-place cards the crew must cast (e.g. the opened card)
         const prefill = ctx.mods.map((m) => m.castPrefill?.(st, ctx, pid)).find(Boolean) || null;
-        return { type: "cast", prompt: "Build your line and lock it in.", limits: st.limits, prefill };
+        const spec = { type: "cast", prompt: "Build your line and lock it in.", limits: limitsFor(st, ctx, pid), prefill };
+        for (const m of ctx.mods) m.castSpec?.(st, ctx, pid, spec); // Contraband adds the item list
+        return spec;
       },
       validate: (st, ctx, pid, v) => castProblem(st, ctx, pid, v),
       apply(st, ctx, answers) {
@@ -91,6 +131,7 @@ export default {
           c = { lines: [{ zone: 0, cards: l.cards }], thumbs: botThumbs(st, ctx, pid, 0) };
         }
         for (const m of ctx.mods) c = m.adjustBotCast?.(st, ctx, pid, c) || c;
+        for (const m of ctx.mods) c = m.finishBotCast?.(st, ctx, pid, c) || c; // Contraband picks its item last, against the final lines
         return repairCast(st, ctx, pid, c);
       },
     },
@@ -167,24 +208,11 @@ export default {
     {
       id: "refill", phase: "REFILL", order: 0, kind: "auto",
       run(st, ctx) {
-        for (const pl of st.players) {
-          const cast = st.casts[pl.id];
-          // only cards that were in the hand (a physical-deck cast may name any card; normal casts always come from the hand)
-          const used = cast ? cast.lines.flatMap((l) => l.cards).filter((id) => pl.hand.includes(id)) : [];
-          pl.hand = pl.hand.filter((id) => !used.includes(id));
-          st.discard.push(...used);
-        }
+        discardUsed(st, ctx); // no-op when The Plug / Wash already moved the used cards out of the hands
+        delete st.usedOut;
         for (const pl of st.players) {
           while (pl.hand.length < ctx.p.hand) {
-            if (!st.deck.length) {
-              if (!st.discard.length) break;
-              st.deck = st.discard.splice(0);
-              for (let i = st.deck.length - 1; i > 0; i--) {
-                const j = Math.floor(rand(st) * (i + 1));
-                [st.deck[i], st.deck[j]] = [st.deck[j], st.deck[i]];
-              }
-              st.log.push({ r: st.round, k: "shuffle", text: "The deck ran out: discards shuffled back in." });
-            }
+            if (!drawable(st, ctx)) break;
             pl.hand.push(st.deck.shift());
           }
         }
