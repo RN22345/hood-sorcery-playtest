@@ -12,7 +12,25 @@ export function allowedZones(st, ctx, pid) {
   return [0];
 }
 
-export function castProblem(st, ctx, pid, v, limits = st.limits) {
+/**
+ * The limits that apply to this crew (Badge vs Cuffed, Back Way, Burner Phone, Extra Hand…). Modules may implement
+ * `limitsFor(st, ctx, pid, limits, cast)` and return a NEW object; with none it returns st.limits itself.
+ */
+export function limitsFor(st, ctx, pid, cast) {
+  let lim = st.limits;
+  for (const m of ctx.mods) {
+    const r = m.limitsFor?.(st, ctx, pid, lim, cast);
+    if (r) lim = r;
+  }
+  return lim;
+}
+
+/** True when a module makes this crew immune to a Wheel effect (Badge, Bribe). `cast` = the cast being checked, if any. */
+export function immune(st, ctx, pid, fx, cast) {
+  return !!fx && ctx.mods.some((m) => m.immune?.(st, ctx, pid, fx, cast));
+}
+
+export function castProblem(st, ctx, pid, v, limits = limitsFor(st, ctx, pid, v)) {
   if (!v || !Array.isArray(v.lines)) return "Malformed cast";
   const pl = st.players[pid];
   const allowed = allowedZones(st, ctx, pid);
@@ -33,7 +51,7 @@ export function castProblem(st, ctx, pid, v, limits = st.limits) {
     fingers += lineStats(ln.cards.map(ctx.card)).len;
   }
   if (count < ctx.p.minCards) return `Cast at least ${ctx.p.minCards} card`;
-  if (count > limits.maxCards) return `Cast at most ${limits.maxCards} card${limits.maxCards === 1 ? "" : "s"} ${limits === st.limits ? "this round" : "here"}`;
+  if (count > limits.maxCards) return `Cast at most ${limits.maxCards} card${limits.maxCards === 1 ? "" : "s"} ${limits === limitsFor(st, ctx, pid, v) ? "this round" : "here"}`;
   if (fingers > limits.line) return `Your line is ${fingers} fingers; the limit is ${limits.line}`;
   const th = v.thumbs || [];
   if (!Array.isArray(th)) return "Malformed Thumbs";
@@ -48,7 +66,9 @@ export function castProblem(st, ctx, pid, v, limits = st.limits) {
 }
 
 export function cleanCast(v) {
-  return { lines: v.lines.filter((l) => l && l.cards && l.cards.length).map((l) => ({ zone: l.zone, cards: [...l.cards] })), thumbs: [...(v.thumbs || [])] };
+  const c = { lines: v.lines.filter((l) => l && l.cards && l.cards.length).map((l) => ({ zone: l.zone, cards: [...l.cards] })), thumbs: [...(v.thumbs || [])] };
+  if (v.item != null) c.item = structuredClone(v.item); // Contraband: the item committed with this cast
+  return c;
 }
 
 /** Bot randomness that never touches the game rng (bots run outside act(), so they must not advance it). */
@@ -63,7 +83,7 @@ export function botRng(st, pid, salt = "") {
 }
 
 /** All lines this crew could cast right now (one zone), each with len/atk/blk. */
-export function lineOptions(st, ctx, pid, maxCards = st.limits.maxCards, limit = st.limits.line) {
+export function lineOptions(st, ctx, pid, maxCards = limitsFor(st, ctx, pid).maxCards, limit = limitsFor(st, ctx, pid).line) {
   return enumerateLines(st.players[pid].hand.map(ctx.card), limit, maxCards);
 }
 
@@ -100,7 +120,7 @@ export function repairCast(st, ctx, pid, cast) {
     if (lines.reduce((a, l) => a + l.cards.length, 0) <= 1) break;
     const longest = lines.reduce((a, l) => (l.cards.length > a.cards.length ? l : a));
     longest.cards.pop();
-    c = { lines: c.lines.filter((l) => l.cards.length), thumbs: c.thumbs.filter((z) => c.lines.some((l) => l.zone === z && l.cards.length)) };
+    c = { ...c, lines: c.lines.filter((l) => l.cards.length), thumbs: c.thumbs.filter((z) => c.lines.some((l) => l.zone === z && l.cards.length)) };
   }
   return c;
 }

@@ -9,7 +9,12 @@ import { modifierProblems } from "../engine/registry.js";
 const { data, modes, modifiers } = loadData();
 const out = new URL("../tests/vectors/", import.meta.url);
 mkdirSync(out, { recursive: true });
-const sets = [[], ...Object.values(modifiers).map((m) => [m])];
+// every single modifier, plus the experiment combinations the C# port must also pass (GP3_OVERHAUL_PLAN.md §4a)
+const combo = (...ids) => ids.map((id) => modifiers[id]);
+const sets = [[], ...Object.values(modifiers).map((m) => [m]),
+  combo("the-plug", "turf-perks", "contraband"),
+  combo("the-plug", "turf-perks", "contraband", "four-corners", "open-card"),
+  combo("turf-perks", "contraband", "block-corner", "hot-corner", "rep-upkeep")];
 let n = 0;
 for (const mode of Object.values(modes)) {
   for (const mods of sets) {

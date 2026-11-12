@@ -48,4 +48,35 @@ These were not in the pathway draft and were filled in to make the mode playable
 - **Rep upkeep** modifier (snowball fix): each corner held **beyond the second** costs 1 Rep that round
   (`repUpkeepFrom: 3`). The draft only says "Rep upkeep"; the threshold is a guess.
 
+### Experiments (optional modifiers, group "Experiments"; spec `Docs/Digital/GP3_OVERHAUL_PLAN.md` §0)
+
+Off by default. Not allowed with the physical deck. **Contraband is retired in the SRD; here it is an experiment.**
+
+- **The Plug** (Corners and Classic): at Refill, after the used cards leave the hands, 4 cards go face up. Crews pick one each
+  (or pass), the crew furthest behind first: lowest Rep (Corners) or most damage (Classic). Ties: more contests lost this round
+  (Classic: more damage this round), then a logged roll-off. Then everyone draws blind up to 8; unpicked cards are discarded.
+  No market in the last round.
+- **Turf Perks** (Corners; turns on Corner locations): the crew holding a location's corner **at the start of the round** gets
+  - Laundromat **Wash**: at Refill, before drawing, put 1 hand card on the bottom of the deck;
+  - Rooftop **Lookout**: before casting, see one rival's hand (your choice);
+  - Precinct **Badge**: Cuffed and Mugged don't affect you;
+  - Subway Grate **Back Way**: your finger limit is +1;
+  - Old Church **Confession**: once per game, right after the spin, re-spin the Wheel;
+  - Bodega: already pays 2 Rep, no extra perk.
+- **Contraband** (Corners): every crew is dealt 2 secret items (of 12: Burner Phone, Lucky Charm, Fake ID, Smoke Bomb, Brass Knuckles,
+  Kevlar Hoodie, Extra Hand, Bribe, Getaway Car, Snitch, Spray Can, Pickpocket). One item a round, locked in with the line and revealed
+  at the flip, then gone. Lucky Charm is played right after the spin (it is that round's item).
+
+Changed from the §7 draft: **Lookout shows a hand, not a line**; **Burner Phone = +1 card** (not "see a line"); **Back Way = +1 to your total
+finger limit**; **Confession = once per game per crew**. Guesses the plan left open:
+
+- Only **one re-spin a round** (Lucky Charm first, then the lowest seat); the re-spun sector replaces the cooldown entry and the sector
+  that was spun can't come up again.
+- **Immunity:** Badge covers Cuffed and Mugged; Bribe covers any curse. Mugged on an immune crew: nothing happens at that corner. Sabotage:
+  an immune holder keeps its ties. Bleeding: no Rep loss.
+- **Fake ID:** you count as the holder at one corner where you have a line; the real holder fights as a challenger.
+- **Smoke Bomb** only matters for ties between a challenger and the holder. **Snitch:** −1 Rep for each contested corner the named crew wins.
+- **Getaway Car:** your lost line with the most ATK moves to the best-paying empty corner and takes it with ATK 1+ (Precinct still charges
+  the original loss; Bleeding ignores that loss). **Pickpocket:** a random unused item of a random rival, after this round's items are revealed.
+
 **Try:** the "4 corners" modifier (the draft's open question: is a crew locked out too often with 3?).

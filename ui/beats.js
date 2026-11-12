@@ -1,6 +1,6 @@
 // Beats for the narrator (ui/show.js): new log entries -> a paced sequence. Pure (no DOM), so it is
 // unit-tested in Node. The structured fields (d, ds, zone, holder, ranks, id) come from the engine's log.
-const QUIET = new Set(["setup", "shuffle"]); // not worth a beat
+const QUIET = new Set(["setup", "shuffle", "perks"]); // perks: shown as badges on the crews and corners // not worth a beat
 
 /** Group new log entries into beats. pace "each" = one crew at a time, "together" = all at once. */
 export function buildBeats(entries, v, pace = "each") {
@@ -15,7 +15,8 @@ export function buildBeats(entries, v, pace = "each") {
     if (QUIET.has(e.k)) continue;
     if (e.k === "round" || e.k === "end") hold();
     if (e.k === "round") { beats.push({ type: "round", round: e.r, caption: e.text, dur: 1000 }); continue; }
-    if (e.k === "wheel") { beats.push({ type: "wheel", id: e.id, caption: e.text, dur: 2700 }); continue; }
+    if (e.k === "wheel" || e.k === "respin") { beats.push({ type: "wheel", id: e.id, caption: e.text, dur: 2700 }); continue; }
+    if (e.k === "item" && e.item) { beats.push({ type: "item", item: e.item, pid: e.pid, caption: e.text, pids: [e.pid], dur: 1500 }); continue; }
     if (e.k === "cast") { beats.push({ type: "say", caption: "All lines are in. Flip them!", dur: 700, sfx: "lock" }); continue; }
     if (e.k === "reveal") {
       const group = [e];

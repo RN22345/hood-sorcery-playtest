@@ -54,6 +54,6 @@ export default {
     let at = lines.find((l) => l.zone === o.zone);
     if (!at) lines.push((at = { zone: o.zone, cards: [] }));
     at.cards.unshift(o.card);
-    return { lines, thumbs: c.thumbs.filter((z) => lines.some((l) => l.zone === z)) };
+    return { ...c, lines, thumbs: c.thumbs.filter((z) => lines.some((l) => l.zone === z)) };
   },
 };

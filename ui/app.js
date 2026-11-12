@@ -31,7 +31,7 @@ const BOT_MS = { slow: 1100, normal: 650, fast: 250 };
 const app = {
   screen: "menu", setupStep: 0, role: null, st: null, view: null, seat: null, setup: null,
   localSeats: [], localCount: 0, focus: null, cover: null, unlocked: null,
-  draft: { key: "", zone: 0, lines: {}, thumbs: [], pick: [] }, allowedZones: [], castProblem: null,
+  draft: { key: "", zone: 0, lines: {}, thumbs: [], pick: [], item: null }, allowedZones: [], castProblem: null,
   net: { code: null, status: "", seatNames: {}, conn2seat: {} },
   showLog: false, error: "", lobbyError: "", survey: { best: "", obvious: "", reads: "", fun: "" }, modal: null,
   settings: Object.assign({ speed: "normal", pace: "each", botSpeed: "normal", results: "auto" }, store.get("settings", {})),
@@ -98,15 +98,17 @@ function prepareDraft(v) {
   const key = `${v.round}|${v.stepIdx}|${v.you}|${c?.step}|${v.log.length}`;
   if (key !== app.draft.key) {
     const zones = c?.type === "cast" ? allowedZones(v, makeCtx(v, app.data), v.you) : [];
-    app.draft = { key, zone: c?.prefill?.zone ?? zones[0] ?? 0, lines: c?.prefill ? { [c.prefill.zone]: [...c.prefill.cards] } : {}, thumbs: [], pick: [] };
+    app.draft = { key, zone: c?.prefill?.zone ?? zones[0] ?? 0, lines: c?.prefill ? { [c.prefill.zone]: [...c.prefill.cards] } : {}, thumbs: [], pick: [], item: null };
     app.allowedZones = zones;
     app.error = app.error && app.role === "client" ? app.error : "";
   }
-  if (c?.type === "cast") app.castProblem = castProblem(v, makeCtx(v, app.data), v.you, draftCast(), c.limits);
+  if (c?.type === "cast") app.castProblem = castProblem(v, makeCtx(v, app.data), v.you, draftCast(), c.step === "openCard" ? c.limits : undefined);
 }
 
 function draftCast() {
-  return { lines: Object.entries(app.draft.lines).map(([z, cards]) => ({ zone: +z, cards })), thumbs: [...app.draft.thumbs] };
+  const cast = { lines: Object.entries(app.draft.lines).map(([z, cards]) => ({ zone: +z, cards })), thumbs: [...app.draft.thumbs] };
+  if (app.draft.item) cast.item = { ...app.draft.item }; // Contraband
+  return cast;
 }
 
 function render() {
@@ -509,7 +511,7 @@ root.addEventListener("click", (e) => {
   const stop = e.target.closest("[data-stop]");
   if (stop && !(t && stop.contains(t))) return; // clicks inside a modal only count on its own buttons
   const cardEl = e.target.closest("[data-card]");
-  if (cardEl && app.screen === "game" && !stop && !cardEl.closest(".results")) return clickCard(cardEl.dataset.card, cardEl);
+  if (cardEl && app.screen === "game" && !stop && !cardEl.closest(".results") && !cardEl.closest(".cardopt")) return clickCard(cardEl.dataset.card, cardEl);
   if (!t || t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA") return;
   if (t.tagName === "BUTTON" && !["lock", "sound"].includes(t.dataset.act)) sound("click", { vol: 0.7 });
   const d = app.draft, v = app.screen === "game" ? currentView() : null;
@@ -546,6 +548,19 @@ root.addEventListener("click", (e) => {
     case "opt": sound("lock"); submit(v.choice.options[+t.dataset.i].value); return;
     case "pickDone": sound("fan"); submit([...d.pick]); return;
     case "zone": d.zone = +t.dataset.zone; break;
+    case "itemPick": {
+      const x = v.choice.items?.find((i) => i.id === t.dataset.id);
+      if (!x) d.item = null;
+      else {
+        d.item = { id: x.id };
+        if (x.needs === "zone") d.item.zone = Object.keys(d.lines).map(Number).includes(d.zone) ? d.zone : Object.keys(d.lines).map(Number)[0];
+        if (x.needs === "rival") d.item.target = v.players.find((p) => p.id !== v.you).id;
+        if (d.item.zone === undefined) delete d.item.zone;
+      }
+      sound("toggle"); break;
+    }
+    case "itemZone": if (d.item) d.item.zone = +t.dataset.zone; sound("click", { vol: 0.5 }); break;
+    case "itemTarget": if (d.item) d.item.target = +t.dataset.pid; sound("click", { vol: 0.5 }); break;
     case "thumbAdd": d.thumbs.push(d.zone); sound("dice"); break;
     case "thumbDel": d.thumbs.pop(); break;
     case "clear": d.lines = {}; d.thumbs = []; sound("fan"); break;
