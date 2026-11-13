@@ -14,7 +14,12 @@ const combo = (...ids) => ids.map((id) => modifiers[id]);
 const sets = [[], ...Object.values(modifiers).map((m) => [m]),
   combo("the-plug", "turf-perks", "contraband"),
   combo("the-plug", "turf-perks", "contraband", "four-corners", "open-card"),
-  combo("turf-perks", "contraband", "block-corner", "hot-corner", "rep-upkeep")];
+  combo("turf-perks", "contraband", "block-corner", "hot-corner", "rep-upkeep"),
+  // FIN-12: Contraband in Classic + character cards, both together, and with the other experiments / Classic twists
+  combo("contraband", "characters"),
+  combo("the-plug", "contraband", "characters"),
+  combo("the-plug", "turf-perks", "contraband", "characters"),
+  combo("contraband", "characters", "run-it-up", "pass-the-tab")];
 let n = 0;
 for (const mode of Object.values(modes)) {
   for (const mods of sets) {

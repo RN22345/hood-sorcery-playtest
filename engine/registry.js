@@ -17,8 +17,9 @@ import respin from "./modules/respin.js";
 import plug from "./modules/plug.js";
 import turfPerks from "./modules/turfPerks.js";
 import contraband from "./modules/contraband.js";
+import characters from "./modules/characters.js";
 
-export const MODULES = { core, matrix, corners, holdTheBlock, postedUp, callOut, passTheTab, forecast, locations, blockCorner, openCard, runItUp, hotCorner, respin, plug, turfPerks, contraband };
+export const MODULES = { core, matrix, corners, holdTheBlock, postedUp, callOut, passTheTab, forecast, locations, blockCorner, openCard, runItUp, hotCorner, respin, plug, turfPerks, contraband, characters };
 
 // Fixed round phases (MULTIMODE_PLAYTEST_PLAN.md §2.1). Modules hook into phases, never reorder them.
 export const PHASES = ["ROUND_START", "PRE_CAST", "CAST", "PRE_REVEAL", "REVEAL", "RESOLVE", "POST_RESOLVE", "REFILL", "ROUND_END"];

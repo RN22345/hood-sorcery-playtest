@@ -48,16 +48,19 @@ test("hooks are neutral: a game without experiments carries none of their state"
   assert.deepEqual(cleanCast({ lines: [], thumbs: [], item: { id: "snitch", target: 1 } }).item, { id: "snitch", target: 1 });
 });
 
-test("requires: experiments are Corners (Plug: Corners or Classic) and never with the physical deck", () => {
+test("requires: Turf Perks is Corners; Plug, Contraband, characters Corners or Classic; never with the physical deck", () => {
   const m = modifiers;
-  assert.deepEqual(modifierProblems(modes.corners, m["the-plug"]), []);
-  assert.deepEqual(modifierProblems(modes.classic, m["the-plug"]), []);
-  assert.ok(modifierProblems(modes["hold-the-block"], m["the-plug"]).length);
-  for (const id of ["turf-perks", "contraband"]) {
+  for (const id of ["the-plug", "contraband", "characters"]) {
     assert.deepEqual(modifierProblems(modes.corners, m[id]), [], id);
-    assert.ok(modifierProblems(modes.classic, m[id]).length, id);
+    assert.deepEqual(modifierProblems(modes.classic, m[id]), [], id); // FIN-12 / D-42: Contraband in both modes
+    assert.ok(modifierProblems(modes["hold-the-block"], m[id]).length, id);
+    assert.ok(modifierProblems(modes["posted-up"], m[id]).length, id);
+  }
+  for (const id of ["turf-perks", "contraband", "characters"]) {
+    assert.deepEqual(modifierProblems(modes.corners, m[id]), [], id);
     assert.ok(modifierProblems(modes.corners, m[id], [m["physical-deck"]]).length, id + " excludes the physical deck");
   }
+  assert.ok(modifierProblems(modes.classic, m["turf-perks"]).length);
   assert.throws(() => mk(["the-plug", "physical-deck"]), /physical/i);
   assert.ok(mk(["turf-perks"]).mode.modules.includes("locations"), "Turf Perks pulls in locations");
   for (const id of ["the-plug", "turf-perks", "contraband"]) assert.equal(modifiers[id].group, "experiment");
