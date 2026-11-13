@@ -63,7 +63,7 @@ Off by default. Not allowed with the physical deck. **Contraband is retired in t
   - Subway Grate **Back Way**: your finger limit is +1;
   - Old Church **Confession**: once per game, right after the spin, re-spin the Wheel;
   - Bodega: already pays 2 Rep, no extra perk.
-- **Contraband** (Corners): every crew is dealt 2 secret items (of 12: Burner Phone, Lucky Charm, Fake ID, Smoke Bomb, Brass Knuckles,
+- **Contraband** (Corners; also in Classic since FIN-12, see `modes/classic.md`): every crew is dealt 2 secret items (of 12: Burner Phone, Lucky Charm, Fake ID, Smoke Bomb, Brass Knuckles,
   Kevlar Hoodie, Extra Hand, Bribe, Getaway Car, Snitch, Spray Can, Pickpocket). One item a round, locked in with the line and revealed
   at the flip, then gone. Lucky Charm is played right after the spin (it is that round's item).
 
@@ -80,3 +80,11 @@ finger limit**; **Confession = once per game per crew**. Guesses the plan left o
   the original loss; Bleeding ignores that loss). **Pickpocket:** a random unused item of a random rival, after this round's items are revealed.
 
 **Try:** the "4 corners" modifier (the draft's open question: is a crew locked out too often with 3?).
+
+### Character cards (experiment, FIN-12 / D-39, D-42): playtest guesses
+
+Same cards and wording as in Classic (full list in `modes/classic.md`). Corners readings:
+- "One of your lines" = the qualifying line with the most ATK + BLK (lowest corner on a tie); the engine picks, there is no prompt.
+- **Underdog:** last = least Rep (ties count), from round 2. **Big Hands:** +1 card on top of every limit (The Turf's extra corner: 5).
+- Bot sweep (500 games, 4 bots): every card adds +0.3 to +0.8 Rep for its holder; Fire/Wind cards (ATK-heavy lines) a little more than
+  Earth/Water (BLK only counts while you hold). Average Rep 6.13 with the cards vs 6.12 without.

@@ -674,6 +674,12 @@ body.flow .statsview .stats { grid-template-columns: 1fr; }
 .item-sub .seg { border-radius: 8px; border: 1px solid var(--line2); }
 .perk { display: inline-block; background: linear-gradient(#34265a, #22183c); border: 1px solid var(--purple); color: #e6d9ff; border-radius: 99px; padding: 0 .55em; font-size: .72em; font-weight: 700; letter-spacing: .02em; }
 .loc .perk { margin: 0 .3em; }
+/* character cards (FIN-12): gold badge on the crew plate, two big cards to pick from at the start */
+.perk.char { background: linear-gradient(#4a3a14, #2b2109); border-color: var(--gold2); color: #ffe9b0; }
+.chars-pick .charopt { flex: 1 1 260px; max-width: 360px; display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: .2em; padding: .7em 1em; border-color: var(--gold2); background: linear-gradient(#3a2d10, #1f180a); box-shadow: 0 0 14px #f5c45a33; }
+.chars-pick .charopt b { font-size: 1.15em; color: #ffe9b0; }
+.chars-pick .charopt small { color: var(--ink2); line-height: 1.25; }
+.chars-pick .ch-ico { font-size: 1.4em; }
 .pocket { font-size: .78em; color: var(--ink2); background: #00000066; border-radius: 99px; padding: 0 .5em; }
 .peek { display: flex; flex-wrap: wrap; align-items: center; gap: .25em; margin-top: .45em; padding: .3em .6em; border-radius: 10px; background: #1b2540; border: 1px solid #5b9be8; font-size: .85em; }
 .peek .card.mini { width: 40px; }

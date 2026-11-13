@@ -11,6 +11,7 @@ import { roundSummary } from "../engine/summary.js";
 import { LOCATIONS } from "../engine/modules/locations.js";
 import { PERKS } from "../engine/modules/turfPerks.js";
 import { ITEMS } from "../engine/modules/contraband.js";
+import { CHARACTERS } from "../engine/modules/characters.js";
 import { audioSettings } from "./fx.js";
 import { resFor } from "./beats.js";
 
@@ -393,7 +394,10 @@ function playerBox(app, v, p, track, hot, holderId) {
   const totals = shown ? `<span class="tot"><b class="a">${shown.atk}</b>/<b class="b">${shown.blk}</b></span>` : r ? `<span class="totals">A <b>${r.atk}</b> B <b>${r.blk}</b></span>` : "";
   const perks = Object.entries(v.perks || {}).filter(([, pid]) => pid === p.id).map(([loc]) => `<span class="perk" title="${esc(PERKS[loc].text)}">★ ${esc(PERKS[loc].name)}</span>`).join("");
   const pocket = v.itemCounts ? (isMe && v.items?.[p.id] ? `<span class="pocket" title="${esc(v.items[p.id].map((id) => ITEMS[id].name).join(", ") || "empty")}">🎒 ${v.items[p.id].length}</span>` : `<span class="pocket" title="Secret items">🎒 ${v.itemCounts[p.id] ?? 0}</span>`) : "";
-  const extra = [isHolder ? '<span class="crown">👑 HOLDER</span>' : "", holdsTxt, perks, pocket, at, totals, rank].filter(Boolean).join("");
+  // character card (public once everyone has picked): a badge with the card's text as its tooltip
+  const ch = CHARACTERS[v.chars?.pick?.[p.id]];
+  const charTag = ch ? `<span class="perk char" title="${esc(ch.text)}">🃏 ${esc(ch.name)}</span>` : "";
+  const extra = [isHolder ? '<span class="crown">👑 HOLDER</span>' : "", holdsTxt, charTag, perks, pocket, at, totals, rank].filter(Boolean).join("");
   return `<div class="pbox ${isMe ? "me" : ""} ${isHolder ? "holder" : ""} ${mine.length ? "changed" : ""} ${deciding && !done ? "thinking" : ""} ${focus ? "focus" : ""}" data-pid="${p.id}" style="--c:${p.color}">
     <img class="standee" src="${p.img}" alt="">
     <div class="pinfo">
@@ -512,7 +516,7 @@ function resultsPopup(app, v) {
   }
   const quiet = new Set(["reveal", "round", "wheel", "cast", "rank", "dmg", "shuffle", "setup", "swap", "flip", "seat"]);
   const extra = v.log.filter((e) => e.r === N && !quiet.has(e.k) && !(e.zone && "holder" in e)).slice(-3);
-  const wheel = v.log.findLast((e) => e.r === N && e.k === "wheel");
+  const wheel = v.log.findLast((e) => e.r === N && (e.k === "wheel" || e.k === "respin")); // a re-spin (Lucky Charm, Confession) replaces the sector
   const wsec = wheel && app.data.wheel.find((w) => w.id === wheel.id);
   return `<div class="results ${matrix ? "with-matrix" : ""}" data-k="res${N}" data-act="closeResults" title="Click to close">
     <div class="res-head"><h2>Round ${N} results</h2>${wsec ? `<span class="wtag ${wsec.type}"><img src="${wsec.img}" alt="">${esc(wsec.name)}</span>` : ""}<span class="grow"></span>
@@ -541,6 +545,10 @@ function actionPanel(app, v, holderId) {
     return `<div class="panel waiting"><span class="muted">${esc(stepName(pend.step))}:</span> waiting for ${waiting.map(chip).join(" ")}<span class="dots3"><i>.</i><i>.</i><i>.</i></span>${marketStrip(app, v)}${err}</div>`;
   }
   if (c.type === "option" && (c.plug || c.wash)) return marketChoice(app, v, c, err);
+  if (c.type === "option" && c.chars) {
+    return `<div class="panel choice chars-pick" data-k="${app.draft.key}"><p class="prompt">${esc(c.prompt)} <small class="muted">The other card goes back unseen.</small></p>
+      <div class="opts">${c.options.map((o, i) => `<button class="opt special charopt" data-act="opt" data-i="${i}"><span class="ch-ico">🃏</span><b>${esc(o.label)}</b><small>${esc(o.hint)}</small></button>`).join("")}</div>${err}</div>`;
+  }
   if (c.type === "option" && c.respin) {
     const sec = app.data.wheel.find((w) => w.id === c.wheel);
     return `<div class="panel choice respin" data-k="${app.draft.key}">${sec ? `<img class="rs-img" src="${sec.img}" alt="">` : ""}<div class="rs-body"><p class="prompt">${esc(c.prompt)}</p>
@@ -656,7 +664,7 @@ function coverScreen(app, v, sum) {
     <button class="primary big" data-act="unlock" data-pid="${p.id}">I'm ${esc(p.name)}: show my hand</button></div></div>`;
 }
 
-const STEP_NAMES = { respin: "the Wheel", plugPick: "The Plug", lookout: "the Lookout", wash: "the Wash", cast: "casting", swapMeet: "Swap Meet", flipScript: "Flip the Script", postUp: "posting up", stayBail: "stay or bail", callOut: "call-outs", passTab: "the Tab", openCard: "opening a card", runItUp: "Run It Up" };
+const STEP_NAMES = { charPick: "picking a character", respin: "the Wheel", plugPick: "The Plug", lookout: "the Lookout", wash: "the Wash", cast: "casting", swapMeet: "Swap Meet", flipScript: "Flip the Script", postUp: "posting up", stayBail: "stay or bail", callOut: "call-outs", passTab: "the Tab", openCard: "opening a card", runItUp: "Run It Up" };
 export const stepName = (s) => STEP_NAMES[s] || s;
 
 function endPanel(app, v) {

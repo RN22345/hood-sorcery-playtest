@@ -146,7 +146,9 @@ export default {
           const rolls = [];
           let six = 0;
           for (const z of cast.thumbs) {
-            const r = d6(st);
+            // thumbRoll (Loaded Dice): a module may replace the roll; with none, exactly one d6 as before
+            let r = d6(st);
+            for (const m of ctx.mods) if (m.thumbRoll) r = m.thumbRoll(st, ctx, pl.id, r);
             rolls.push({ zone: z, r });
             const ln = lines.find((l) => l.zone === z);
             if (r === 1 && st.fx !== "cleanKit") { ln.atk -= 1; ln.blk -= 1; }
@@ -155,6 +157,7 @@ export default {
             else if (r === 6) six += 1;
           }
           pl.thumbs -= cast.thumbs.length;
+          for (const m of ctx.mods) m.adjustRolled?.(st, ctx, pl.id, lines); // after Thumbs (Fake ID in Classic swaps ATK/BLK)
           for (const ln of lines) { ln.atk = clamp(ln.atk); ln.blk = clamp(ln.blk); }
           const sum = (k) => lines.reduce((a, l) => a + l[k], 0);
           st.res[pl.id] = { lines, rolls, six, atk: clamp(sum("atk")), blk: clamp(sum("blk")), len: sum("len") };
@@ -197,6 +200,8 @@ export default {
         if (ctx.cfg.win.track !== "damage") return;
         for (const pl of st.players) {
           let d = st.rd[pl.id];
+          // settleDamage (Contraband in Classic: Snitch, Getaway Car, Spray Can): before Thumb 6, which stays the last step
+          for (const m of ctx.mods) if (m.settleDamage) d = m.settleDamage(st, ctx, pl.id, d);
           const six = st.res[pl.id].six;
           if (six) d = Math.max(0, d - six);
           st.rd[pl.id] = d;

@@ -244,6 +244,30 @@ in `registry.js` (`rounds 8, hand 8, thumbs 2, line 8, maxCards 3`).
   - Not allowed with `physical-deck` (new `requires.excludes`). Hooks are neutral: no new steps, log lines or RNG draws in a game
     that does not load the modules, so all 220 older vectors are unchanged.
 
+- **FIN-12: Contraband in Classic + character cards (2026-11-13, D-39, D-42).** Contraband's `requires` is now `modes: [corners,
+  classic]`; new modifier `characters` (group `experiment`, param `charDeal` 2 = pick 1 of 2, 1 = just dealt), Corners + Classic, not
+  with the physical deck. Hold the Block / Posted Up left out (not in the Finals build). Design record and cut list:
+  `Docs/Concept Rework/13_Character_Cards_and_Contraband_All_Modes.md` §2a, §4a. Choices, all flagged in `modes/classic.md`:
+  - **Commonality rule (user: "there should be comonality"):** an item changes only where the mode makes it meaningless. A corner in
+    Corners = a **ranking** in Classic (1st ATK, 1st BLK). 8 items word for word; Fake ID (swap ATK/BLK after the Thumbs), Getaway Car
+    (2+ damage → 1 less), Snitch (+1 damage per ranking the rival tops), Spray Can (heal 1 per ranking you top) change. `itemDef(id, mode)`
+    gives the mode's text and pick; the tray shows it. Corners text and code paths are untouched (`ITEMS` is still the Corners entry).
+  - **New neutral hooks:** `thumbRoll` and `adjustRolled` (core reveal), `settleDamage` (core settle, before Thumb 6), `rankEntry` + an
+    optional `win` flag in `rankEntries` (matrix), `immune` asked by the matrix on Mugged / Sabotage / Bleeding (`rotateExcept`). No steps
+    were added to `core`, `matrix` or `contraband` (that would shift `stepIdx`); all character steps live in the new module. Unused hooks:
+    no RNG draw, no log line. `git diff tests/vectors` after re-export: only added files.
+  - **Character cards:** 8 of the 10 drafted (Cool Head, Light Touch, Thick Skin, Slippery cut; Gale Rider / Tide Watcher renamed Storm
+    Chaser / The Plumber so no card sounds like a crew). Changed from the draft after bot sweeps: the element cards are "+1 ATK and +1 BLK
+    on a line with 2+ cards of the element" (the draft's +1 BLK was worth ~0 in Corners, where BLK only counts while holding); **Big
+    Hands = +1 card** (+1 finger was worth nothing: three cards fill 8 fingers, and longer lines lose rank ties); **Underdog** counts ties
+    and starts in round 2; **Loaded Dice** also gives +1 Thumb. Corners picks "one of your lines" for the player (most ATK+BLK). The
+    pick is a hidden simultaneous `charPick` choice (ROUND_START 2, round 1 only), the offers stay secret (`redactView`), the kept card is
+    public. One `char` log line a round, after the reveal lines (so the narrator's reveal group stays together).
+  - **Bots:** Classic item picks read rivals' past totals (Fake ID only when the swap beats more rivals; Getaway Car on a weak line, Spray Can
+    on a strong one, Snitch on the least-damaged rival, Burner Phone / Extra Hand only if a wider line is better). Character picks weigh
+    the hand's share of the element and the sweep results (`botWorth`).
+  - Results pop-up: the Wheel tag now shows the re-spun sector (it showed the first spin after a Lucky Charm / Confession).
+
 ### Hosting: is GitHub Pages enough?
 
 Yes, for this stage. Pages serves static files, and the site is static: the game logic runs in the host
@@ -526,3 +550,21 @@ simulator before committing, and append to §6.
   6.3 Contraband; Classic + Plug damage 7.0 vs 6.9 (so the Plug barely moves a bot game).
 - Open: the C# port (S1b); the replay screen and the online (peer) flow were not tried with the experiments (they only read views and logs);
   bots ignore the information from Lookout; Unity UI for all three is S3. Not tried on a phone or online (peer) with a client.
+
+### 2026-11-13 · Claude Code (desktop, Opus 5.5) · FIN-12: Contraband in Classic + character cards
+- Engine: `contraband.js` Classic readings (`itemDef`, `adjustRolled`, `rankEntry`, `settleDamage`, Classic bot items); new
+  `engine/modules/characters.js` (8 cards, pick step, note step, `limitsFor`, `adjustLine`, `thumbRoll`, `redactView`, bot pick); neutral hooks
+  in `core.js`, `matrix.js`, `rank.js`; modifier `characters`; Contraband allowed in Classic. Details in §4.
+- UI: both toggles in the Classic lobby (Experiments); character pick panel (two gold cards); 🃏 badge on each crew plate; item tray shows the
+  Classic texts; reveal banners and results lines come from the new log lines; re-spun Wheel tag in the results pop-up.
+- Tests: new `tests/fin12.test.js` (13 tests: every vector replays, neutral hooks, every Classic item, every character card, hidden info,
+  200 bot games per combination); the experiments `requires` test updated. Vectors: 316 (262 old byte-identical, 54 new: Classic +
+  Contraband, characters in both modes, both together, and with the Plug / Turf Perks / Run It Up + Pass the Tab).
+- Verified: `npm test` 63 pass; `node tools/simulate.mjs 50` clean (also with each new modifier). Sweep, 500 games × 4 bots: Classic avg damage
+  6.79 plain / 6.79 Contraband / 6.67 characters / 6.62 both, seat wins 22–30%; Corners avg Rep 6.12 / 6.28 / 6.13 / 6.27, seat wins 20–31%
+  (the 20/31 spread with Contraband is the same as before this change). Per card (seat 1 forced, 500 games): Classic −0.5 (Loaded Dice) to
+  −1.5 (Big Hands) damage; Corners +0.3 to +0.8 Rep. In the browser: Classic lobby toggles, pick panel, badges, Turf limit 5 cards with Big
+  Hands, Fake ID in the tray and its reveal banner, results lines (Character cards, Spray Can); no console errors.
+- Open: not playtested by people; Corners UI with characters only checked through tests (same code paths); online (peer) flow not tried with
+  the new pick step; the C# port and Unity UI are later stages (hooks to mirror: `thumbRoll`, `adjustRolled`, `settleDamage`, `rankEntry`/`win`,
+  matrix `immune` + `rotateExcept`); Loaded Dice is weak and may want a rethink.

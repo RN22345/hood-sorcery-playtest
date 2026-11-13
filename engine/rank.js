@@ -9,8 +9,10 @@ import { d6 } from "./rng.js";
  * @returns {number[]} pids, 1st place first
  */
 export function rankEntries(st, entries, label = "") {
-  const sorted = [...entries].sort((a, b) => b.val - a.val || a.len - b.len || b.other - a.other);
-  const same = (a, b) => a.val === b.val && a.len === b.len && a.other === b.other;
+  // `win` (optional, Smoke Bomb in Classic): on an equal value the entry with the flag goes first. Unset = 0, so callers
+  // that never set it sort exactly as before.
+  const sorted = [...entries].sort((a, b) => b.val - a.val || (b.win | 0) - (a.win | 0) || a.len - b.len || b.other - a.other);
+  const same = (a, b) => a.val === b.val && (a.win | 0) === (b.win | 0) && a.len === b.len && a.other === b.other;
   const out = [];
   for (let i = 0; i < sorted.length; ) {
     let j = i + 1;
